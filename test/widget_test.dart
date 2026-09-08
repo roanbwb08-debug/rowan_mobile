@@ -1,30 +1,38 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:rowan_mobile/core/api/api_client.dart';
+import 'package:rowan_mobile/core/auth/auth_controller.dart';
+import 'package:rowan_mobile/core/widgets/rowan_avatar.dart';
 
-import 'package:rowan_mobile/main.dart';
+class _FakeClient extends http.BaseClient {
+  http.Request? request;
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest baseRequest) async {
+    request = baseRequest as http.Request;
+    return http.StreamedResponse(Stream.value(utf8.encode(jsonEncode({'message': 'connected'}))), 200, headers: {'content-type': 'application/json'});
+  }
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Rowan avatar is rendered', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: RowanAvatar())));
+    expect(find.byIcon(Icons.auto_awesome), findsOneWidget);
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  test('missing Supabase configuration fails clearly', () async {
+    expect(
+      () => AuthController.create(),
+      throwsA(isA<AuthConfigurationException>()),
+    );
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('API client sends backend URL and bearer token', () async {
+    final client = _FakeClient();
+    final api = RowanApiClient(baseUrl: 'https://rowan.example/', accessToken: 'token-123', client: client);
+    await api.chat('hello');
+    expect(client.request?.url.toString(), 'https://rowan.example/api/chat');
+    expect(client.request?.headers['authorization'], 'Bearer token-123');
   });
 }
