@@ -1,0 +1,432 @@
+{
+  "users": [
+    {
+      "id": "tlo3za1tmhg",
+      "email": "nobleroan474@gmail.com",
+      "organizationId": "kvuaw4zwew",
+      "role": "administrator",
+      "name": "Rowan User",
+      "createdAt": "2026-09-01T08:38:56.330Z"
+    },
+    {
+      "id": "po0j9plhdho",
+      "email": "��\u001f������\u001b{���ݾ��}�Zw��",
+      "organizationId": "1oyd82aon9h",
+      "role": "administrator",
+      "name": "Rowan User",
+      "createdAt": "2026-09-01T09:00:07.923Z"
+    }
+  ],
+  "organizations": [
+    {
+      "id": "kvuaw4zwew",
+      "name": "Rowan AI Workspace",
+      "createdAt": "2026-09-01T08:38:56.330Z"
+    },
+    {
+      "id": "1oyd82aon9h",
+      "name": "Rowan AI Workspace",
+      "createdAt": "2026-09-01T09:00:07.910Z"
+    }
+  ],
+  "stores": [
+    {
+      "id": "lmktg0grc5h",
+      "organizationId": "kvuaw4zwew",
+      "name": "Personal Workspace",
+      "domain": "workspace.local",
+      "industry": "general",
+      "knowledge": "",
+      "createdAt": "2026-09-01T08:38:56.330Z"
+    },
+    {
+      "id": "3doyly2x4g6",
+      "organizationId": "1oyd82aon9h",
+      "name": "Personal Workspace",
+      "domain": "workspace.local",
+      "industry": "general",
+      "knowledge": "",
+      "createdAt": "2026-09-01T09:00:07.924Z"
+    }
+  ],
+  "assistant_settings": [
+    {
+      "id": "mtwckoocg5e",
+      "organizationId": "kvuaw4zwew",
+      "voice": "natural-male",
+      "theme": "light",
+      "persona": "Universal Personal AI Assistant",
+      "rateLimit": 60,
+      "createdAt": "2026-09-01T08:38:56.331Z"
+    },
+    {
+      "id": "ii6ilzt4gce",
+      "organizationId": "1oyd82aon9h",
+      "voice": "natural-male",
+      "theme": "light",
+      "persona": "Universal Personal AI Assistant",
+      "rateLimit": 60,
+      "createdAt": "2026-09-01T09:00:07.924Z"
+    }
+  ],
+  "assistant_configs": [],
+  "integrations": [
+    {
+      "id": "q191ibbtckr",
+      "organizationId": "kvuaw4zwew",
+      "provider": "shopify",
+      "config": {
+        "name": "Shopify Store Connection"
+      },
+      "enabled": true,
+      "createdAt": "2026-09-01T08:38:56.331Z"
+    },
+    {
+      "id": "vojack9o5g8",
+      "organizationId": "kvuaw4zwew",
+      "provider": "twilio",
+      "config": {
+        "name": "Twilio SMS Webhooks"
+      },
+      "enabled": true,
+      "createdAt": "2026-09-01T08:38:56.331Z"
+    },
+    {
+      "id": "eiuiidp82mo",
+      "organizationId": "kvuaw4zwew",
+      "provider": "woocommerce",
+      "config": {
+        "name": "WooCommerce API Connector"
+      },
+      "enabled": false,
+      "createdAt": "2026-09-01T08:38:56.332Z"
+    },
+    {
+      "id": "bxckjxtkbic",
+      "organizationId": "1oyd82aon9h",
+      "provider": "shopify",
+      "config": {
+        "name": "Shopify Store Connection"
+      },
+      "enabled": true,
+      "createdAt": "2026-09-01T09:00:07.924Z"
+    },
+    {
+      "id": "c3k5kkbkhja",
+      "organizationId": "1oyd82aon9h",
+      "provider": "twilio",
+      "config": {
+        "name": "Twilio SMS Webhooks"
+      },
+      "enabled": true,
+      "createdAt": "2026-09-01T09:00:07.924Z"
+    },
+    {
+      "id": "8r8s1qg16r9",
+      "organizationId": "1oyd82aon9h",
+      "provider": "woocommerce",
+      "config": {
+        "name": "WooCommerce API Connector"
+      },
+      "enabled": false,
+      "createdAt": "2026-09-01T09:00:07.925Z"
+    }
+  ],
+  "conversations": [
+    {
+      "id": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "userId": "po0j9plhdho",
+      "organizationId": "1oyd82aon9h",
+      "storeId": "3doyly2x4g6",
+      "title": "Store Assistant Chat",
+      "createdAt": "2026-09-01T09:00:07.925Z",
+      "updatedAt": "2026-09-01T09:28:17.693Z"
+    },
+    {
+      "id": "33774133-bf48-4708-906c-92117298d8c4",
+      "userId": "tlo3za1tmhg",
+      "organizationId": "kvuaw4zwew",
+      "storeId": "lmktg0grc5h",
+      "title": "Store Assistant Chat",
+      "createdAt": "2026-09-01T09:31:25.930Z",
+      "updatedAt": "2026-09-01T09:31:27.642Z"
+    }
+  ],
+  "analytics_events": [
+    {
+      "organizationId": "1oyd82aon9h",
+      "sessionId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "type": "conversation",
+      "data": {
+        "messageLength": 3,
+        "responseLength": 231,
+        "productsCount": 0
+      },
+      "timestamp": "2026-09-01T09:00:12.123Z",
+      "id": "049y3cu1eif8"
+    },
+    {
+      "organizationId": "1oyd82aon9h",
+      "sessionId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "type": "customer_intent",
+      "data": {
+        "intentName": "Deterministic routed task plan"
+      },
+      "timestamp": "2026-09-01T09:00:12.123Z",
+      "id": "rqv8z2fjpn"
+    },
+    {
+      "organizationId": "1oyd82aon9h",
+      "sessionId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "type": "conversation",
+      "data": {
+        "messageLength": 3,
+        "responseLength": 57,
+        "productsCount": 0
+      },
+      "timestamp": "2026-09-01T09:15:23.988Z",
+      "id": "vt003vg6ac"
+    },
+    {
+      "organizationId": "1oyd82aon9h",
+      "sessionId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "type": "customer_intent",
+      "data": {
+        "intentName": "Deterministic routed task plan"
+      },
+      "timestamp": "2026-09-01T09:15:23.988Z",
+      "id": "fasj4h5m3wl"
+    },
+    {
+      "organizationId": "1oyd82aon9h",
+      "sessionId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "type": "conversation",
+      "data": {
+        "messageLength": 19,
+        "responseLength": 57,
+        "productsCount": 0
+      },
+      "timestamp": "2026-09-01T09:15:52.295Z",
+      "id": "ehh312fza5j"
+    },
+    {
+      "organizationId": "1oyd82aon9h",
+      "sessionId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "type": "customer_intent",
+      "data": {
+        "intentName": "Deterministic routed task plan"
+      },
+      "timestamp": "2026-09-01T09:15:52.295Z",
+      "id": "akcqeetp4c9"
+    },
+    {
+      "organizationId": "1oyd82aon9h",
+      "sessionId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "type": "conversation",
+      "data": {
+        "messageLength": 3,
+        "responseLength": 163,
+        "productsCount": 0
+      },
+      "timestamp": "2026-09-01T09:28:17.693Z",
+      "id": "52sztlvu9t"
+    },
+    {
+      "organizationId": "1oyd82aon9h",
+      "sessionId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "type": "customer_intent",
+      "data": {
+        "intentName": "Deterministic routed task plan"
+      },
+      "timestamp": "2026-09-01T09:28:17.693Z",
+      "id": "oh1fclgbjwh"
+    },
+    {
+      "organizationId": "kvuaw4zwew",
+      "sessionId": "33774133-bf48-4708-906c-92117298d8c4",
+      "type": "conversation",
+      "data": {
+        "messageLength": 5,
+        "responseLength": 141,
+        "productsCount": 0
+      },
+      "timestamp": "2026-09-01T09:31:27.642Z",
+      "id": "zvroga8vhyr"
+    },
+    {
+      "organizationId": "kvuaw4zwew",
+      "sessionId": "33774133-bf48-4708-906c-92117298d8c4",
+      "type": "customer_intent",
+      "data": {
+        "intentName": "Deterministic routed task plan"
+      },
+      "timestamp": "2026-09-01T09:31:27.642Z",
+      "id": "jp76h2hdlfl"
+    }
+  ],
+  "products": [],
+  "conversations/8549ef20-dc4b-4800-8a5f-749bd161300e/messages": [
+    {
+      "id": "g8jiv2ytk1",
+      "conversationId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "organizationId": "1oyd82aon9h",
+      "role": "user",
+      "text": "hey",
+      "products": [],
+      "timestamp": "2026-09-01T09:00:12.118Z"
+    },
+    {
+      "id": "9ubi4j24its",
+      "conversationId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "organizationId": "1oyd82aon9h",
+      "role": "assistant",
+      "text": "Hello! I'm Rowan, your personal AI assistant. It's great to meet you.\n\nHow can I help you today? Whether you're looking for help with research, need to organize information, or just have a question on your mind, I'm here to assist.",
+      "products": [],
+      "timestamp": "2026-09-01T09:00:12.121Z"
+    },
+    {
+      "id": "ctjdcd5wzu",
+      "conversationId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "organizationId": "1oyd82aon9h",
+      "role": "user",
+      "text": "hey",
+      "products": [],
+      "timestamp": "2026-09-01T09:15:23.984Z"
+    },
+    {
+      "id": "m4vx2xtiui",
+      "conversationId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "organizationId": "1oyd82aon9h",
+      "role": "assistant",
+      "text": "I have processed your request. How else can I assist you?",
+      "products": [],
+      "timestamp": "2026-09-01T09:15:23.986Z"
+    },
+    {
+      "id": "jgv6h9due9",
+      "conversationId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "organizationId": "1oyd82aon9h",
+      "role": "user",
+      "text": "what are you saying",
+      "products": [],
+      "timestamp": "2026-09-01T09:15:52.293Z"
+    },
+    {
+      "id": "1xyqnja7f02",
+      "conversationId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "organizationId": "1oyd82aon9h",
+      "role": "assistant",
+      "text": "I have processed your request. How else can I assist you?",
+      "products": [],
+      "timestamp": "2026-09-01T09:15:52.294Z"
+    },
+    {
+      "id": "5o8k5zqxgoa",
+      "conversationId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "organizationId": "1oyd82aon9h",
+      "role": "user",
+      "text": "hey",
+      "products": [],
+      "timestamp": "2026-09-01T09:28:17.691Z"
+    },
+    {
+      "id": "093lbbckvgph",
+      "conversationId": "8549ef20-dc4b-4800-8a5f-749bd161300e",
+      "organizationId": "1oyd82aon9h",
+      "role": "assistant",
+      "text": "Hey there! I’m Rowan, your personal AI assistant. How can I help you today? If you have any questions or need assistance with something specific, just let me know!",
+      "products": [],
+      "timestamp": "2026-09-01T09:28:17.692Z"
+    }
+  ],
+  "websites": [
+    {
+      "id": "site_891ba53a44fc",
+      "userId": "tlo3za1tmhg",
+      "organizationId": "kvuaw4zwew",
+      "domain": "autodetail-lead-agent.netlify.app",
+      "url": "https://autodetail-lead-agent.netlify.app",
+      "name": "autodetai",
+      "instructions": "",
+      "personality": "Warm & Professional",
+      "welcomeMessage": "Hi! I'm Rowan. How can I help you today?",
+      "language": "en",
+      "categories": [
+        "General"
+      ],
+      "thingsToKnow": "",
+      "thingsNotToSay": "",
+      "status": "connected",
+      "verificationStatus": "unverified",
+      "pagesCrawled": 1,
+      "createdAt": "2026-09-01T09:03:32.590Z",
+      "updatedAt": "2026-09-01T09:03:32.930Z",
+      "lastCrawledAt": "2026-09-01T09:03:32.930Z"
+    },
+    {
+      "id": "site_4da03e191559",
+      "userId": "tlo3za1tmhg",
+      "organizationId": "kvuaw4zwew",
+      "domain": "autodetail-lead-agent.netlify.app",
+      "url": "https://autodetail-lead-agent.netlify.app",
+      "name": "autodetail",
+      "instructions": "",
+      "personality": "Warm & Professional",
+      "welcomeMessage": "Hi! I'm Rowan. How can I help you today?",
+      "language": "en",
+      "categories": [
+        "General"
+      ],
+      "thingsToKnow": "",
+      "thingsNotToSay": "",
+      "status": "connected",
+      "verificationStatus": "unverified",
+      "pagesCrawled": 1,
+      "createdAt": "2026-09-01T09:29:40.377Z",
+      "updatedAt": "2026-09-01T09:29:41.030Z",
+      "lastCrawledAt": "2026-09-01T09:29:41.030Z"
+    }
+  ],
+  "website_knowledge": [
+    {
+      "id": "k_b144b5bd9c37",
+      "siteId": "site_891ba53a44fc",
+      "organizationId": "kvuaw4zwew",
+      "url": "https://autodetail-lead-agent.netlify.app",
+      "title": "Apex Auto Care & Detailing | Premium Automotive Services (Part 1)",
+      "content": "Apex Auto Care & Detailing | Premium Automotive Services\nAPEX\nMOTORS\nServices\nAbout Us\nContact\nBook Appointment\n24/7 AI-Powered Booking Active\nPrecision Auto Repair & Ceramic Detailing\nFrom advanced engine diagnostics to high-end ceramic coatings, our certified team keeps your vehicle running and looking like new. \nAI Assistant Online: Click the chat icon in the corner to book instantly! \nOur Premium Services\n🛠️\nEngine Diagnostics\nFull computer scan, electrical troubleshooting, and precision mechanical repairs. \n✨\nFull Detailing & Polish\nPaint correction, interior deep cleaning, and multi-stage exterior polishing. \n🛡️\nCeramic Coating\nLong-lasting hydrophobic paint protection shielding your vehicle from UV and scratches. \n© 2026 Apex Motors.  All rights reserved.",
+      "snippet": "Apex Auto Care & Detailing | Premium Automotive Services APEX MOTORS Services About Us Contact Book Appointment 24/7 AI-Powered Booking Active Precision Auto Repair & Ceramic Detailing From advanced e...",
+      "createdAt": "2026-09-01T09:03:32.929Z"
+    },
+    {
+      "id": "k_853edd182c8e",
+      "siteId": "site_4da03e191559",
+      "organizationId": "kvuaw4zwew",
+      "url": "https://autodetail-lead-agent.netlify.app",
+      "title": "Apex Auto Care & Detailing | Premium Automotive Services (Part 1)",
+      "content": "Apex Auto Care & Detailing | Premium Automotive Services\nAPEX\nMOTORS\nServices\nAbout Us\nContact\nBook Appointment\n24/7 AI-Powered Booking Active\nPrecision Auto Repair & Ceramic Detailing\nFrom advanced engine diagnostics to high-end ceramic coatings, our certified team keeps your vehicle running and looking like new. \nAI Assistant Online: Click the chat icon in the corner to book instantly! \nOur Premium Services\n🛠️\nEngine Diagnostics\nFull computer scan, electrical troubleshooting, and precision mechanical repairs. \n✨\nFull Detailing & Polish\nPaint correction, interior deep cleaning, and multi-stage exterior polishing. \n🛡️\nCeramic Coating\nLong-lasting hydrophobic paint protection shielding your vehicle from UV and scratches. \n© 2026 Apex Motors.  All rights reserved.",
+      "snippet": "Apex Auto Care & Detailing | Premium Automotive Services APEX MOTORS Services About Us Contact Book Appointment 24/7 AI-Powered Booking Active Precision Auto Repair & Ceramic Detailing From advanced e...",
+      "createdAt": "2026-09-01T09:29:41.029Z"
+    }
+  ],
+  "conversations/33774133-bf48-4708-906c-92117298d8c4/messages": [
+    {
+      "id": "pngeadoplj",
+      "conversationId": "33774133-bf48-4708-906c-92117298d8c4",
+      "organizationId": "kvuaw4zwew",
+      "role": "user",
+      "text": "hello",
+      "products": [],
+      "timestamp": "2026-09-01T09:31:27.640Z"
+    },
+    {
+      "id": "eg7iaw4aunv",
+      "conversationId": "33774133-bf48-4708-906c-92117298d8c4",
+      "organizationId": "kvuaw4zwew",
+      "role": "assistant",
+      "text": "Hello! I'm Rowan, your personal AI assistant. How can I help you today? If you have any questions or tasks in mind, feel free to let me know!",
+      "products": [],
+      "timestamp": "2026-09-01T09:31:27.641Z"
+    }
+  ]
+}

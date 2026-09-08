@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+:root {
+  --text: #27272a; /* zinc-800 */
+  --text-h: #09090b; /* zinc-950 */
+  --bg: #fcfcfc; /* near-white */
+  --border: #e4e4e7; /* zinc-200 */
+  --code-bg: #f4f4f5; /* zinc-100 */
+  --accent: #2563eb; /* blue-600 */
+  --accent-bg: rgba(37, 99, 235, 0.05);
+  --accent-border: rgba(37, 99, 235, 0.2);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 16px/150% var(--sans);
+  letter-spacing: 0.15px;
+  color-scheme: light;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: #fcfcfc;
+  color: #27272a;
+}
+
+#root {
+  width: 100%;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* Custom Orb Animations for Rowan - Redesigned with premium ORANGE exclusively for Voice Experience */
+@keyframes orbGlow {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 25px rgba(249, 115, 22, 0.2), 0 0 50px rgba(249, 115, 22, 0.05);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 40px rgba(249, 115, 22, 0.4), 0 0 75px rgba(249, 115, 22, 0.15);
+  }
+}
+
+@keyframes listeningPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.4), 0 0 40px rgba(249, 115, 22, 0.15);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 35px rgba(249, 115, 22, 0.6), 0 0 65px rgba(249, 115, 22, 0.25);
+  }
+}
+
+@keyframes thinkingPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 35px rgba(249, 115, 22, 0.5);
+  }
+}
+
+@keyframes speakingPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.4);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 35px rgba(249, 115, 22, 0.6);
+  }
+}
+
+@keyframes interruptedPulse {
+  0% {
+    transform: scale(1.12);
+    box-shadow: 0 0 35px rgba(245, 158, 11, 0.8), 0 0 60px rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    transform: scale(0.96);
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.5);
+  }
+}
+
+.orb-listening {
+  animation: listeningPulse 1.2s infinite ease-in-out;
+}
+
+.orb-thinking {
+  animation: thinkingPulse 1.8s infinite linear;
+}
+
+.orb-speaking {
+  animation: speakingPulse 1s infinite ease-in-out;
+}
+
+.orb-interrupted {
+  animation: interruptedPulse 0.5s ease-out infinite;
+}
+
+.orb-glow {
+  animation: orbGlow 3.5s infinite ease-in-out;
+}
+
+/* Custom thin scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e4e4e7;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d4d4d8;
+}

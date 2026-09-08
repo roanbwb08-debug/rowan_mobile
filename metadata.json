@@ -1,0 +1,13 @@
+{
+  "name": "Rowan AI",
+  "description": "A personal AI companion and intelligent assistant that accompanies you across devices, websites, and apps.",
+  "requestFramePermissions": [
+    "microphone",
+    "autoplay",
+    "speaker-selection",
+    "display-capture"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
