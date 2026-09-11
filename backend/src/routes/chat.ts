@@ -6,7 +6,7 @@ import { RowanOrchestrator } from '../services/ai/orchestration.js'
 import { getOrCreateSessionContext, getConversationMessages, appendConversationMessage, getTenantConnection, getTenantConnections } from '../services/db.js'
 import { retrieveLongTermMemory, updateConversationMemoryAndSummary } from '../services/memory.js'
 import { logChatAnalytics } from '../services/analytics.js'
-import { verifySupabaseToken } from '../services/supabase.js'
+import { requireSupabaseUser } from '../services/supabase.js'
 import type { RowanConnectionContext } from '../rowan.js'
 
 interface EcomProduct {
@@ -85,15 +85,9 @@ router.post('/', async (req, res) => {
     const sessionId = parsed.data.sessionId ?? crypto.randomUUID()
     
     // Check for Supabase Auth Bearer Token
-    let userEmail = 'nobleroan474@gmail.com'
-    const authHeader = req.headers.authorization
-    if (authHeader) {
-      const supabaseUser = await verifySupabaseToken(authHeader)
-      if (supabaseUser && supabaseUser.email) {
-        userEmail = supabaseUser.email
-        console.log(`[SUPABASE AUTH] Isolated session context for authenticated user: ${userEmail}`)
-      }
-    }
+    const supabaseUser = await requireSupabaseUser(req.headers.authorization)
+    const userEmail = supabaseUser.email
+    console.log(`[SUPABASE AUTH] Isolated session context for authenticated user: ${userEmail}`)
     
     // Resolve Tenant Context via Cloud Firestore with Isolation
     const tenantContext = await getOrCreateSessionContext(sessionId, userEmail)
@@ -275,6 +269,10 @@ router.post('/', async (req, res) => {
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : 'Unknown error'
     console.error('[ORCHESTRATION ROUTE ERROR] Failed:', errMsg)
+
+    if (typeof error === 'object' && error !== null && 'statusCode' in error && error.statusCode === 401) {
+      return res.status(401).json({ success: false, message: 'Authentication is required.' })
+    }
 
     let clientMsg = 'Rowan could not respond right now. Please try again.'
     if (errMsg.includes('429') || errMsg.toLowerCase().includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) {

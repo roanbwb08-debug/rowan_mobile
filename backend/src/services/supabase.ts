@@ -55,3 +55,13 @@ export async function verifySupabaseToken(authHeader?: string) {
     return null
   }
 }
+
+export async function requireSupabaseUser(authHeader?: string) {
+  const user = await verifySupabaseToken(authHeader)
+  if (!user?.email) {
+    const error = new Error('Authentication is required.') as Error & { statusCode?: number }
+    error.statusCode = 401
+    throw error
+  }
+  return user
+}

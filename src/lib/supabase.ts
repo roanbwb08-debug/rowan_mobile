@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
-// Check if we are in placeholder/offline simulation mode
-export const isSandboxMode = !supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')
+// Rowan accounts must be backed by the shared Supabase project.
+export const isSandboxMode = false
 
 // Initialize Supabase Client
 export const supabase = createClient(
@@ -200,7 +200,10 @@ export const rowanAuth = {
       }
     }
     const { data: { session } } = await supabase.auth.getSession()
-    return session?.user || null
+    const user = session?.user
+    return user?.email
+      ? { id: user.id, email: user.email, createdAt: user.created_at }
+      : null
   },
 
   async getSessionToken(): Promise<string | null> {
@@ -244,7 +247,11 @@ export const rowanAuth = {
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      callback(session?.user || null, session?.access_token || null)
+      const user = session?.user
+      callback(
+        user?.email ? { id: user.id, email: user.email, createdAt: user.created_at } : null,
+        session?.access_token || null
+      )
     })
     return { data: { subscription } }
   },

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { getOrCreateTenant } from '../services/db.js'
-import { verifySupabaseToken } from '../services/supabase.js'
+import { requireSupabaseUser } from '../services/supabase.js'
 import {
   getTenantWebsites,
   getTenantWebsite,
@@ -16,21 +16,12 @@ import { verifyWebsiteInstallation } from '../services/verification.js'
 import { crawlAndIndexWebsite } from '../services/crawler.js'
 
 const router = Router()
-const DEFAULT_EMAIL = 'nobleroan474@gmail.com'
-
 /**
  * Middleware / helper to resolve authenticated tenant context.
  */
 async function resolveTenant(req: import('express').Request) {
-  let email = DEFAULT_EMAIL
-  const authHeader = req.headers.authorization
-  if (authHeader) {
-    const supabaseUser = await verifySupabaseToken(authHeader)
-    if (supabaseUser && supabaseUser.email) {
-      email = supabaseUser.email
-    }
-  }
-  return await getOrCreateTenant(email)
+  const user = await requireSupabaseUser(req.headers.authorization)
+  return await getOrCreateTenant(user.email)
 }
 
 /**

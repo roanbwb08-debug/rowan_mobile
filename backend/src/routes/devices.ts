@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import crypto from 'crypto'
 import { z } from 'zod'
-import { verifySupabaseToken } from '../services/supabase.js'
+import { requireSupabaseUser } from '../services/supabase.js'
 import {
   getOrCreateTenant,
   savePairingSession,
@@ -71,15 +71,9 @@ function hashPairingCode(code: string): string {
 
 // Helper to authenticate request and resolve tenant
 async function resolveAuthUser(authHeader?: string) {
-  let userEmail = 'nobleroan474@gmail.com'
-  let userId = 'user_default'
-  if (authHeader) {
-    const supabaseUser = await verifySupabaseToken(authHeader)
-    if (supabaseUser && supabaseUser.email) {
-      userEmail = supabaseUser.email
-      userId = supabaseUser.id
-    }
-  }
+  const supabaseUser = await requireSupabaseUser(authHeader)
+  const userEmail = supabaseUser.email
+  const userId = supabaseUser.id
   const tenant = await getOrCreateTenant(userEmail)
   return {
     userId: userId || tenant.user.id,
