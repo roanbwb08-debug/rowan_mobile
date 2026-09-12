@@ -1,16 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Load Supabase environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://hmxcmabaksskjjsbylws.supabase.co'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_46-DkUPTM9hGpAiUBpbSJw_CjU9CrTM'
 
 // Rowan accounts must be backed by the shared Supabase project.
 export const isSandboxMode = false
 
 // Initialize Supabase Client
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder-project.supabase.co',
-  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder',
+  supabaseUrl,
+  supabaseAnonKey,
   {
     auth: {
       persistSession: true,
@@ -335,17 +335,40 @@ export const rowanConversations = {
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     }
 
-    const { data, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false })
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false })
 
-    if (error) {
-      console.error('Error fetching Supabase conversations:', error.message)
-      return []
+      if (!error && data && data.length > 0) {
+        return data
+      }
+    } catch {
+      // Graceful fallback
     }
-    return data || []
+
+    // Fallback: fetch conversations from backend service API
+    try {
+      const res = await fetch('/api/tenant/conversations')
+      if (res.ok) {
+        const result = await res.json()
+        if (result.success && Array.isArray(result.conversations)) {
+          return result.conversations.map((c: Record<string, unknown>) => ({
+            id: c.id as string,
+            user_id: (c.userId as string) || userId,
+            title: (c.title as string) || 'Untitled Session',
+            created_at: (c.createdAt as string) || new Date().toISOString(),
+            updated_at: (c.updatedAt as string) || new Date().toISOString()
+          }))
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[SUPABASE CONVERSATIONS] API fallback notice:', apiErr)
+    }
+
+    return []
   },
 
   async createConversation(userId: string, title: string): Promise<SupabaseConversation | null> {
@@ -366,17 +389,19 @@ export const rowanConversations = {
       return newConv
     }
 
-    const { data, error } = await supabase
-      .from('conversations')
-      .insert(newConv)
-      .select()
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .insert(newConv)
+        .select()
+        .single()
 
-    if (error) {
-      console.error('Error creating Supabase conversation:', error.message)
-      return null
+      if (!error && data) return data
+    } catch {
+      // Fallback
     }
-    return data
+
+    return newConv
   },
 
   async getMessages(conversationId: string): Promise<SupabaseMessage[]> {
@@ -387,17 +412,39 @@ export const rowanConversations = {
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     }
 
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', conversationId)
-      .order('timestamp', { ascending: true })
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('timestamp', { ascending: true })
 
-    if (error) {
-      console.error('Error fetching Supabase messages:', error.message)
-      return []
+      if (!error && data && data.length > 0) return data
+    } catch {
+      // Fallback
     }
-    return data || []
+
+    // Fallback: fetch messages from backend API
+    try {
+      const res = await fetch(`/api/tenant/conversations/${conversationId}/messages`)
+      if (res.ok) {
+        const result = await res.json()
+        if (result.success && Array.isArray(result.messages)) {
+          return result.messages.map((m: Record<string, unknown>, idx: number) => ({
+            id: (m.id as string) || `msg_${idx}`,
+            conversation_id: conversationId,
+            role: (m.role as 'user' | 'assistant' | 'system') || 'assistant',
+            text: (m.text as string) || '',
+            products: (m.products as ProductReference[]) || [],
+            timestamp: (m.timestamp as string) || new Date().toISOString()
+          }))
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[SUPABASE MESSAGES] API fallback notice:', apiErr)
+    }
+
+    return []
   },
 
   async saveMessage(conversationId: string, role: 'user' | 'assistant' | 'system', text: string, products: ProductReference[] = []): Promise<SupabaseMessage | null> {

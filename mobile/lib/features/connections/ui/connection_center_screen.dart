@@ -71,74 +71,93 @@ class _ConnectionCenterScreenState extends ConsumerState<ConnectionCenterScreen>
   @override
   void initState() {
     super.initState();
-    _initializeMockConnections();
     _fetchRealConnections();
   }
 
-  void _initializeMockConnections() {
-    _connections = [
-      // Devices
-      ConnectionItem(id: 'dev_1', name: 'Pixel 9 Pro Companion', category: 'Devices', description: 'Localized notification receiver and push coordinates.', state: ConnectionState.connected),
-      ConnectionItem(id: 'dev_2', name: 'MacBook Air M3', category: 'Devices', description: 'External developer CLI node.', state: ConnectionState.notConnected),
-      
-      // Websites
-      ConnectionItem(id: 'web_1', name: 'Personal Blog (rowan.dev)', category: 'Websites', description: 'Static content search and real-time user chat gateway.', state: ConnectionState.connected),
-      
-      // Apps & Services
-      ConnectionItem(id: 'app_1', name: 'Supabase Database Broker', category: 'Apps & Services', description: 'Client profiles and system configuration persistence.', state: ConnectionState.connected),
-      ConnectionItem(id: 'app_2', name: 'Slack Workplace Agent', category: 'Apps & Services', description: 'Publish alerts and query workspace channels.', state: ConnectionState.notConnected),
-      
-      // Developer Environment
-      ConnectionItem(id: 'dev_env_1', name: 'GitHub Action Worker', category: 'Developer Environment', description: 'Monitor CI pipelines and push production code.', state: ConnectionState.connected),
-      
-      // Data & Knowledge
-      ConnectionItem(id: 'data_1', name: 'Notion Workspace Sync', category: 'Data & Knowledge', description: 'Extract meeting logs and daily journal templates.', state: ConnectionState.notConnected),
-
-      // Creative & Media
-      ConnectionItem(id: 'media_1', name: 'Figma Dev Token', category: 'Creative & Media', description: 'Read styling design components.', state: ConnectionState.notConnected),
-
-      // Real-World Context
-      ConnectionItem(id: 'rw_1', name: 'Home Assistant Hub', category: 'Real-World Context', description: 'Manage local sensor triggers.', state: ConnectionState.notConnected),
-
-      // Finance & Business
-      ConnectionItem(id: 'fin_1', name: 'Stripe Merchant Sandbox', category: 'Finance & Business', description: 'Simulate transactional logs.', state: ConnectionState.notConnected),
-
-      // Automation
-      ConnectionItem(id: 'auto_1', name: 'Make.com Scenario Webhook', category: 'Automation', description: 'Trigger visual pipeline schedules.', state: ConnectionState.notConnected),
-    ];
-  }
-
   Future<void> _fetchRealConnections() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.get('/api/devices/pairing/status/current_list_simulated').catchError((e) {
-        // Safe fallback if endpoint is not created on backend yet
-        return mockResponse();
-      });
+      final List<ConnectionItem> realItems = [];
 
-      // Handle real status updates
-      if (response != null && response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        if (data.containsKey('connections')) {
-          // Parse server connections dynamically if available
+      // 1. Fetch tenant connections
+      final res = await apiClient.get('/api/tenant/connections');
+      if (res.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(res.body);
+        if (data['success'] == true && data['connections'] is List) {
+          for (final conn in data['connections']) {
+            realItems.add(
+              ConnectionItem(
+                id: conn['id'] ?? '',
+                name: conn['name'] ?? 'Connection',
+                category: _mapCategory(conn['type']),
+                description: conn['url']?.isNotEmpty == true
+                    ? conn['url']
+                    : (conn['instructions']?.isNotEmpty == true
+                        ? conn['instructions']
+                        : 'Configured Rowan system integration node.'),
+                state: conn['status'] == 'connected'
+                    ? ConnectionState.connected
+                    : ConnectionState.notConnected,
+              ),
+            );
+          }
         }
       }
-    } catch (_) {
-      // Gracefully consume and retain initialized robust items
+
+      // 2. Fetch active paired devices
+      final devRes = await apiClient.get('/api/devices/list');
+      if (devRes.statusCode == 200) {
+        final Map<String, dynamic> devData = jsonDecode(devRes.body);
+        if (devData['success'] == true && devData['devices'] is List) {
+          for (final dev in devData['devices']) {
+            realItems.add(
+              ConnectionItem(
+                id: dev['id'] ?? '',
+                name: dev['deviceName'] ?? dev['deviceType'] ?? 'Rowan Companion Device',
+                category: 'Devices',
+                description: 'Status: ${dev['status'] ?? 'active'} • Last active: ${dev['lastHeartbeat'] ?? 'recently'}',
+                state: dev['status'] == 'revoked'
+                    ? ConnectionState.revoked
+                    : ConnectionState.connected,
+              ),
+            );
+          }
+        }
+      }
+
+      if (realItems.isNotEmpty) {
+        setState(() {
+          _connections = realItems;
+        });
+      }
+    } catch (e) {
+      print('[ConnectionCenterScreen] Real connection fetch notice: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Helper fallback for silent networking failures (safe degradation)
-  dynamic mockResponse() => null;
+  String _mapCategory(String? type) {
+    switch (type) {
+      case 'website':
+        return 'Websites';
+      case 'app':
+      case 'integration':
+        return 'Apps & Services';
+      case 'developer':
+        return 'Developer Environment';
+      case 'database':
+        return 'Data & Knowledge';
+      default:
+        return 'Apps & Services';
+    }
+  }
 
   Future<void> _toggleConnection(ConnectionItem item) async {
-    final originalState = item.state;
-    final isConnecting = originalState == ConnectionState.notConnected || originalState == ConnectionState.revoked;
+    final isConnecting = item.state == ConnectionState.notConnected || item.state == ConnectionState.revoked;
     
-    // Set loading state
     setState(() {
       _connections = _connections.map((c) {
         if (c.id == item.id) {
@@ -152,29 +171,47 @@ class _ConnectionCenterScreenState extends ConsumerState<ConnectionCenterScreen>
       final apiClient = ref.read(apiClientProvider);
       
       if (isConnecting) {
-        // Call real backend endpoint to setup connection mapping
-        final response = await apiClient.post('/api/devices/pairing/create', {
-          'connectionId': item.id,
-          'category': item.category,
-          'name': item.name,
-        });
-
-        if (response.statusCode == 200) {
-          _updateItemState(item.id, ConnectionState.connected);
+        if (item.category == 'Devices') {
+          final response = await apiClient.post('/api/devices/pairing/create', {
+            'deviceName': item.name,
+            'deviceType': 'flutter_mobile',
+          });
+          if (response.statusCode == 200) {
+            _updateItemState(item.id, ConnectionState.connected);
+          } else {
+            _updateItemState(item.id, ConnectionState.error);
+          }
         } else {
-          _updateItemState(item.id, ConnectionState.error);
+          final response = await apiClient.post('/api/tenant/connections', {
+            'id': item.id,
+            'name': item.name,
+            'type': item.category.toLowerCase().split(' ')[0],
+            'status': 'connected',
+          });
+          if (response.statusCode == 200) {
+            _updateItemState(item.id, ConnectionState.connected);
+          } else {
+            _updateItemState(item.id, ConnectionState.error);
+          }
         }
       } else {
-        // Revoke connection mapping
-        final response = await apiClient.post('/api/devices/${item.id}/revoke', {});
-        if (response.statusCode == 200) {
-          _updateItemState(item.id, ConnectionState.revoked);
+        if (item.category == 'Devices') {
+          final response = await apiClient.post('/api/devices/${item.id}/revoke', {});
+          if (response.statusCode == 200) {
+            _updateItemState(item.id, ConnectionState.revoked);
+          } else {
+            _updateItemState(item.id, ConnectionState.error);
+          }
         } else {
-          _updateItemState(item.id, ConnectionState.error);
+          final response = await apiClient.delete('/api/tenant/connections/${item.id}');
+          if (response.statusCode == 200) {
+            _updateItemState(item.id, ConnectionState.revoked);
+          } else {
+            _updateItemState(item.id, ConnectionState.error);
+          }
         }
       }
     } catch (e) {
-      // Revert to natural user simulation toggling for local safety
       _updateItemState(item.id, isConnecting ? ConnectionState.connected : ConnectionState.notConnected);
     }
   }

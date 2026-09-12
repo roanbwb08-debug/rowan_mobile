@@ -12,7 +12,10 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
-  ShieldCheck
+  ShieldCheck,
+  Database,
+  Key,
+  Lock
 } from 'lucide-react'
 import { rowanAuth } from '../lib/supabase'
 import {
@@ -61,6 +64,16 @@ export const Settings: React.FC = () => {
   const [smsTriggersEnabled, setSmsTriggersEnabled] = useState(true)
   const [tradingEnabled, setTradingEnabled] = useState(false)
 
+  // Supabase API Keys Vault states
+  const [keyStatuses, setKeyStatuses] = useState<Record<string, { configured: boolean; preview: string }>>({})
+  const [openaiKeyInput, setOpenaiKeyInput] = useState('')
+  const [geminiKeyInput, setGeminiKeyInput] = useState('')
+  const [tavilyKeyInput, setTavilyKeyInput] = useState('')
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState('')
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState('')
+  const [savingKeys, setSavingKeys] = useState(false)
+  const [keysSaved, setKeysSaved] = useState(false)
+
   // Status/Lifecycle states
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -99,11 +112,60 @@ export const Settings: React.FC = () => {
         if (isMounted) setLoading(false)
       }
     }
+
+    const fetchKeyStatuses = async () => {
+      try {
+        const res = await fetch('/api/tenant/api-keys')
+        const data = await res.json()
+        if (isMounted && data.success && data.keys) {
+          setKeyStatuses(data.keys)
+        }
+      } catch (err) {
+        console.warn('Failed to load API key statuses:', err)
+      }
+    }
+
     fetchSettings()
+    fetchKeyStatuses()
     return () => {
       isMounted = false
     }
   }, [])
+
+  const handleSaveApiKeys = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingKeys(true)
+    try {
+      const payload: Record<string, string> = {}
+      if (openaiKeyInput.trim()) payload.OPENAI_API_KEY = openaiKeyInput.trim()
+      if (geminiKeyInput.trim()) payload.GEMINI_API_KEY = geminiKeyInput.trim()
+      if (tavilyKeyInput.trim()) payload.TAVILY_API_KEY = tavilyKeyInput.trim()
+      if (supabaseUrlInput.trim()) payload.SUPABASE_URL = supabaseUrlInput.trim()
+      if (supabaseKeyInput.trim()) payload.SUPABASE_ANON_KEY = supabaseKeyInput.trim()
+
+      const res = await fetch('/api/tenant/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        if (data.keys) setKeyStatuses(data.keys)
+        setKeysSaved(true)
+        setOpenaiKeyInput('')
+        setGeminiKeyInput('')
+        setTavilyKeyInput('')
+        setSupabaseUrlInput('')
+        setSupabaseKeyInput('')
+        setTimeout(() => setKeysSaved(false), 2500)
+      }
+    } catch (err) {
+      console.error('Failed to store API keys in Supabase:', err)
+    } finally {
+      setSavingKeys(false)
+    }
+  }
 
   useEffect(() => {
     if (previewChatEndRef.current) {
@@ -515,7 +577,117 @@ export const Settings: React.FC = () => {
             </div>
           </Card>
 
-          {/* Section 4: Advanced Safeguards & Preferences */}
+          {/* Section 4: Supabase API Keys & Secrets Vault */}
+          <Card title="Supabase API Keys Vault" subtitle="Store API keys securely in Supabase without putting credentials in git files" extra={<Key className="w-4 h-4 text-emerald-600" />} id="settings-card-supabase-vault">
+            <div className="space-y-4">
+              <div className="p-3.5 bg-emerald-50/60 rounded-xl border border-emerald-100 flex items-start gap-3">
+                <Database className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-bold text-zinc-900 my-0">Supabase Persistent Key Management</h4>
+                  <p className="text-[11px] text-zinc-600 leading-normal my-0 font-medium">
+                    Saving keys here persists them safely in your Supabase database and active runtime memory. They bypass local <code className="bg-emerald-100/80 px-1 py-0.5 rounded text-[10px] font-mono text-emerald-900">.env</code> files to avoid GitHub secret scanning blocks.
+                  </p>
+                </div>
+              </div>
+
+              {/* Current Status Pills */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {[
+                  { name: 'OpenAI Key', id: 'OPENAI_API_KEY' },
+                  { name: 'Gemini Key', id: 'GEMINI_API_KEY' },
+                  { name: 'Tavily Key', id: 'TAVILY_API_KEY' },
+                  { name: 'Supabase URL', id: 'SUPABASE_URL' },
+                  { name: 'Supabase Key', id: 'SUPABASE_ANON_KEY' }
+                ].map((item) => {
+                  const stat = keyStatuses[item.id]
+                  const isConfigured = stat?.configured
+                  return (
+                    <div key={item.id} className="p-2 bg-zinc-50 border border-zinc-200 rounded-lg flex flex-col justify-between space-y-1">
+                      <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider">{item.name}</span>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[11px] font-mono font-bold ${isConfigured ? 'text-zinc-800' : 'text-zinc-400'}`}>
+                          {stat?.preview || 'Not Configured'}
+                        </span>
+                        <span className={`w-2 h-2 rounded-full ${isConfigured ? 'bg-emerald-500' : 'bg-zinc-300'}`} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Form Inputs for Keys */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-450 uppercase tracking-wider block">OpenAI API Key</label>
+                  <input
+                    type="password"
+                    value={openaiKeyInput}
+                    onChange={(e) => setOpenaiKeyInput(e.target.value)}
+                    placeholder="sk-proj-..."
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 text-zinc-800 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-450 uppercase tracking-wider block">Gemini API Key</label>
+                  <input
+                    type="password"
+                    value={geminiKeyInput}
+                    onChange={(e) => setGeminiKeyInput(e.target.value)}
+                    placeholder="AIzaSy..."
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 text-zinc-800 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-450 uppercase tracking-wider block">Tavily Research Key</label>
+                  <input
+                    type="password"
+                    value={tavilyKeyInput}
+                    onChange={(e) => setTavilyKeyInput(e.target.value)}
+                    placeholder="tvly-..."
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 text-zinc-800 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-450 uppercase tracking-wider block">Supabase Project URL</label>
+                  <input
+                    type="text"
+                    value={supabaseUrlInput}
+                    onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                    placeholder="https://xyz.supabase.co"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 text-zinc-800 font-mono"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-450 uppercase tracking-wider block">Supabase Anon Key</label>
+                  <input
+                    type="password"
+                    value={supabaseKeyInput}
+                    onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR..."
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 text-zinc-800 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  onClick={handleSaveApiKeys}
+                  isLoading={savingKeys}
+                  icon={keysSaved ? <Check className="w-3.5 h-3.5 text-white" /> : <Lock className="w-3.5 h-3.5 text-white" />}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm cursor-pointer px-4 py-2 rounded-lg"
+                >
+                  {keysSaved ? 'Keys Stored in Supabase Vault!' : 'Save Keys to Supabase Vault'}
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Section 5: Advanced Safeguards & Preferences */}
           <Card title="System Guard & Preferences" id="settings-card-preferences">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">

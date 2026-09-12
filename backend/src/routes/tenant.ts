@@ -15,11 +15,24 @@ import {
 } from '../services/db.js'
 import { db } from '../services/firebase.js'
 import { searchProducts } from '../services/catalog.js'
+import { getAllKeyStatuses, saveApiKeyToSupabase, verifySupabaseToken } from '../services/supabase.js'
+import type { Request } from 'express'
 
 const router = Router()
 
-// Default tenant email for the current logged-in user
+// Default tenant email fallback for unauthenticated local development
 const DEFAULT_EMAIL = 'nobleroan474@gmail.com'
+
+async function resolveTenantEmail(req: Request): Promise<string> {
+  const authHeader = req.headers.authorization
+  if (authHeader) {
+    const user = await verifySupabaseToken(authHeader)
+    if (user?.email) {
+      return user.email
+    }
+  }
+  return DEFAULT_EMAIL
+}
 
 /**
  * GET /api/tenant
@@ -27,7 +40,8 @@ const DEFAULT_EMAIL = 'nobleroan474@gmail.com'
  */
 router.get('/', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     
     // Fetch latest store doc with new fields
     const storeDoc = await db.collection('stores').doc(tenant.store.id).get()
@@ -95,7 +109,8 @@ router.post('/store', async (req, res) => {
   }
 
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     const storeRef = db.collection('stores').doc(tenant.store.id)
     
     const updateData = { ...parsed.data }
@@ -133,7 +148,8 @@ router.post('/store', async (req, res) => {
  */
 router.get('/settings', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     let settings = await getAssistantSettings(tenant.organization.id)
     if (!settings) {
       await updateAssistantSettings(tenant.organization.id, {})
@@ -178,7 +194,8 @@ router.post('/settings', async (req, res) => {
   }
 
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     const orgId = tenant.organization.id
     
     // Get existing settings to retrieve current version
@@ -232,7 +249,8 @@ router.post('/settings', async (req, res) => {
  */
 router.get('/settings/versions', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     const versionsSnap = await db
       .collection('assistant_configs')
       .where('organizationId', '==', tenant.organization.id)
@@ -266,7 +284,8 @@ router.post('/settings/rollback', async (req, res) => {
   }
 
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     const orgId = tenant.organization.id
 
     // Find the requested config version
@@ -316,7 +335,8 @@ router.post('/settings/rollback', async (req, res) => {
  */
 router.get('/integrations', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     const integrations = await getIntegrations(tenant.organization.id)
     return res.json({ success: true, integrations })
   } catch (error: unknown) {
@@ -340,7 +360,8 @@ router.post('/integrations/toggle', async (req, res) => {
   }
 
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     await toggleIntegration(tenant.organization.id, parsed.data.provider)
     return res.json({ success: true, message: 'Integration status updated.' })
   } catch (error: unknown) {
@@ -355,7 +376,8 @@ router.post('/integrations/toggle', async (req, res) => {
  */
 router.get('/conversations', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     const conversationsSnap = await db
       .collection('conversations')
       .where('organizationId', '==', tenant.organization.id)
@@ -381,7 +403,8 @@ router.get('/conversations', async (req, res) => {
  */
 router.get('/conversations/:id/messages', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     const messages = await getConversationMessages(req.params.id, tenant.organization.id)
     
     // Resolve product IDs to full Product objects for the frontend
@@ -415,7 +438,8 @@ router.post('/conversations/:id', async (req, res) => {
   try {
     const { title } = req.body
     if (!title) return res.status(400).json({ success: false, message: 'Title is required' })
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     
     // Validate conversation belongs to tenant
     const convRef = db.collection('conversations').doc(req.params.id)
@@ -438,7 +462,8 @@ router.post('/conversations/:id', async (req, res) => {
  */
 router.delete('/conversations/:id', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     await deleteConversation(req.params.id, tenant.organization.id)
     return res.json({ success: true, message: 'Conversation deleted successfully' })
   } catch (error: unknown) {
@@ -453,7 +478,8 @@ router.delete('/conversations/:id', async (req, res) => {
  */
 router.get('/connections', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     const type = req.query.type as string | undefined
     const connections = await getTenantConnections(tenant.organization.id, type)
     return res.json({ success: true, connections })
@@ -468,7 +494,8 @@ router.get('/connections', async (req, res) => {
  */
 router.get('/connections/:id', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     const connection = await getTenantConnection(req.params.id, tenant.organization.id)
     if (!connection) {
       return res.status(404).json({ success: false, message: 'Connection not found' })
@@ -486,7 +513,8 @@ router.get('/connections/:id', async (req, res) => {
  */
 router.post('/connections', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     const { id, type, name, url, instructions, role, personality, additional_instructions, status } = req.body
     
     const saved = await saveTenantConnection(tenant.organization.id, tenant.user.id, {
@@ -513,12 +541,58 @@ router.post('/connections', async (req, res) => {
  */
 router.delete('/connections/:id', async (req, res) => {
   try {
-    const tenant = await getOrCreateTenant(DEFAULT_EMAIL)
+    const tenantEmail = await resolveTenantEmail(req)
+    const tenant = await getOrCreateTenant(tenantEmail)
     await deleteTenantConnection(req.params.id, tenant.organization.id)
     return res.json({ success: true, message: 'Connection removed successfully' })
   } catch (error: unknown) {
     console.error('[TENANT ROUTE ERROR] DELETE /connections/:id:', error)
     return res.status(500).json({ success: false, message: 'Failed to delete connection' })
+  }
+})
+
+/**
+ * GET /api/tenant/api-keys
+ * Retrieve current API key status summary (masked for privacy) from Supabase or server env.
+ */
+router.get('/api-keys', async (req, res) => {
+  try {
+    const statuses = await getAllKeyStatuses()
+    return res.json({ success: true, keys: statuses })
+  } catch (error: unknown) {
+    console.error('[TENANT ROUTE ERROR] GET /api-keys:', error)
+    return res.status(500).json({ success: false, message: 'Failed to retrieve API key statuses' })
+  }
+})
+
+/**
+ * POST /api/tenant/api-keys
+ * Persist provided API keys directly into Supabase and update active runtime environment.
+ */
+router.post('/api-keys', async (req, res) => {
+  try {
+    const keysMap = req.body as Record<string, string>
+    if (!keysMap || typeof keysMap !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid payload dictionary.' })
+    }
+
+    const savedKeys: string[] = []
+    for (const [keyName, keyValue] of Object.entries(keysMap)) {
+      if (typeof keyValue === 'string') {
+        const success = await saveApiKeyToSupabase(keyName, keyValue)
+        if (success) savedKeys.push(keyName)
+      }
+    }
+
+    const updatedStatuses = await getAllKeyStatuses()
+    return res.json({
+      success: true,
+      message: `Successfully stored ${savedKeys.length} API keys in Supabase.`,
+      keys: updatedStatuses
+    })
+  } catch (error: unknown) {
+    console.error('[TENANT ROUTE ERROR] POST /api-keys:', error)
+    return res.status(500).json({ success: false, message: 'Failed to store API keys in Supabase' })
   }
 })
 

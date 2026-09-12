@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/config/app_config.dart';
 import 'core/theme/rowan_theme.dart';
 import 'features/auth/ui/login_screen.dart';
 import 'features/auth/providers/auth_provider.dart';
@@ -9,14 +10,10 @@ import 'features/home/ui/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    runApp(const ConfigurationErrorApp());
-    return;
-  }
-
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+  await Supabase.initialize(
+    url: AppConfig.supabaseUrl,
+    anonKey: AppConfig.supabaseAnonKey,
+  );
 
   runApp(const ProviderScope(child: RowanMobileApp()));
 }

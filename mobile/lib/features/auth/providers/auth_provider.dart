@@ -21,18 +21,36 @@ class AuthService {
   final SupabaseClient _supabase;
   AuthService(this._supabase);
 
+  Future<void> _ensureProfileExists(User user) async {
+    try {
+      await _supabase.from('profiles').upsert({
+        'id': user.id,
+        'email': user.email ?? '',
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      print('[AuthService] Profile auto-upsert notice: $e');
+    }
+  }
+
   Future<void> signIn(String email, String password) async {
-    await _supabase.auth.signInWithPassword(
+    final response = await _supabase.auth.signInWithPassword(
       email: email,
       password: password,
     );
+    if (response.user != null) {
+      await _ensureProfileExists(response.user!);
+    }
   }
 
   Future<void> signUp(String email, String password) async {
-    await _supabase.auth.signUp(
+    final response = await _supabase.auth.signUp(
       email: email,
       password: password,
     );
+    if (response.user != null) {
+      await _ensureProfileExists(response.user!);
+    }
   }
 
   Future<void> signOut() async {

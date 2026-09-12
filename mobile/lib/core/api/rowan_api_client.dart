@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/app_config.dart';
 
 class RowanApiClient {
   final String baseUrl;
@@ -9,9 +10,9 @@ class RowanApiClient {
 
   RowanApiClient(
     this._supabase, {
-    this.baseUrl = const String.fromEnvironment('BACKEND_URL', defaultValue: 'http://10.0.2.2:3000'),
+    String? baseUrl,
     this.timeoutDuration = const Duration(seconds: 15),
-  });
+  }) : baseUrl = baseUrl ?? AppConfig.backendUrl;
 
   Future<Map<String, String>> _getSecureHeaders({bool isMultipart = false}) async {
     final session = _supabase.auth.currentSession;

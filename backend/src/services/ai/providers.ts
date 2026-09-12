@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { AIProvider } from './types.js'
 import { sanitizeGeminiModel } from './generation.js'
+import { getApiKeyFromSupabaseOrEnv } from '../supabase.js'
 
 let isOpenAIQuotaExhausted = false
 let lastOpenAIQuotaCheck = 0
@@ -15,7 +16,7 @@ export function markOpenAIQuotaExhausted(): void {
 }
 
 export async function checkOpenAIQuotaStatus(apiKey?: string): Promise<boolean> {
-  const key = apiKey || process.env.OPENAI_API_KEY
+  const key = apiKey || await getApiKeyFromSupabaseOrEnv('OPENAI_API_KEY')
   if (!key) return true
 
   const now = Date.now()
@@ -121,11 +122,11 @@ export class OpenAIProvider implements AIProvider {
       screenFrame?: string
     }
   ): Promise<{ text: string; modelUsed: string }> {
-    const apiKey = process.env.OPENAI_API_KEY
+    const apiKey = await getApiKeyFromSupabaseOrEnv('OPENAI_API_KEY')
     if (!apiKey) {
       throw new ProviderError(
         'openai',
-        'OPENAI_API_KEY is not configured on the server.',
+        'OPENAI_API_KEY is not configured on the server or in Supabase.',
         false,
         'unauthorized'
       )
@@ -266,11 +267,11 @@ export class GeminiProvider implements AIProvider {
       screenFrame?: string
     }
   ): Promise<{ text: string; modelUsed: string }> {
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = await getApiKeyFromSupabaseOrEnv('GEMINI_API_KEY')
     if (!apiKey) {
       throw new ProviderError(
         'gemini',
-        'GEMINI_API_KEY is not configured on the server.',
+        'GEMINI_API_KEY is not configured on the server or in Supabase.',
         false,
         'unauthorized'
       )

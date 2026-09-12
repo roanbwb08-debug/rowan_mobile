@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://placeholder-project.supabase.co'
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://hmxcmabaksskjjsbylws.supabase.co'
 // Prefer service-role key for backend operations if supplied; otherwise fall back to anon key
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder'
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_46-DkUPTM9hGpAiUBpbSJw_CjU9CrTM'
 
 export const supabaseAdmin = createClient(supabaseUrl, supabaseKey, {
   auth: {
@@ -65,3 +65,121 @@ export async function requireSupabaseUser(authHeader?: string) {
   }
   return user
 }
+
+// Memory cache for runtime keys fetched from Supabase
+const memoryKeyCache: Record<string, string> = {}
+
+/**
+ * Retrieve an API key dynamically from process.env, memory cache, or Supabase.
+ */
+export async function getApiKeyFromSupabaseOrEnv(keyName: string): Promise<string | undefined> {
+  // 1. Check process.env
+  if (process.env[keyName] && process.env[keyName]?.trim() !== '') {
+    return process.env[keyName]
+  }
+
+  // 2. Check memory cache
+  if (memoryKeyCache[keyName] && memoryKeyCache[keyName].trim() !== '') {
+    return memoryKeyCache[keyName]
+  }
+
+  // 3. Check Supabase DB table 'app_api_keys' or 'api_keys'
+  try {
+    const isSandbox = !process.env.SUPABASE_URL || supabaseUrl.includes('placeholder-project')
+    if (!isSandbox) {
+      const { data, error } = await supabaseAdmin
+        .from('app_api_keys')
+        .select('value')
+        .eq('key_name', keyName)
+        .single()
+
+      if (!error && data?.value) {
+        memoryKeyCache[keyName] = data.value
+        process.env[keyName] = data.value
+        return data.value
+      }
+    }
+  } catch (err) {
+    console.warn(`[SUPABASE KEYS] Could not fetch ${keyName} from Supabase table:`, err)
+  }
+
+  return undefined
+}
+
+/**
+ * Persist an API key into Supabase 'app_api_keys' table and update active runtime process.env.
+ */
+export async function saveApiKeyToSupabase(keyName: string, keyValue: string): Promise<boolean> {
+  if (!keyName || !keyName.trim()) return false
+
+  const cleanVal = keyValue ? keyValue.trim() : ''
+  
+  // Always update memory cache & active process.env
+  memoryKeyCache[keyName] = cleanVal
+  if (cleanVal) {
+    process.env[keyName] = cleanVal
+  } else {
+    delete process.env[keyName]
+  }
+
+  // Try storing to Supabase
+  try {
+    const isSandbox = !process.env.SUPABASE_URL || supabaseUrl.includes('placeholder-project')
+    if (!isSandbox) {
+      const { error } = await supabaseAdmin
+        .from('app_api_keys')
+        .upsert({
+          key_name: keyName,
+          value: cleanVal,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key_name' })
+
+      if (error) {
+        console.warn(`[SUPABASE KEYS] Error saving ${keyName} to Supabase:`, error.message)
+      } else {
+        console.log(`[SUPABASE KEYS] Successfully saved ${keyName} to Supabase.`)
+      }
+    }
+  } catch (err) {
+    console.warn(`[SUPABASE KEYS] Exception saving ${keyName} to Supabase:`, err)
+  }
+
+  return true
+}
+
+/**
+ * Retrieve status summary of stored keys (masked for privacy)
+ */
+export async function getAllKeyStatuses(): Promise<Record<string, { configured: boolean; preview: string }>> {
+  const targetKeys = [
+    'OPENAI_API_KEY',
+    'GEMINI_API_KEY',
+    'TAVILY_API_KEY',
+    'SUPABASE_URL',
+    'SUPABASE_ANON_KEY',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'PRIMARY_AI_PROVIDER',
+    'BACKUP_AI_PROVIDER',
+    'GITHUB_CLIENT_ID',
+    'GITHUB_CLIENT_SECRET'
+  ]
+
+  const result: Record<string, { configured: boolean; preview: string }> = {}
+
+  for (const k of targetKeys) {
+    const val = await getApiKeyFromSupabaseOrEnv(k)
+    const configured = !!(val && val.trim() !== '')
+    let preview = 'Not Configured'
+    if (configured && val) {
+      if (val.length > 8) {
+        preview = `${val.slice(0, 4)}...${val.slice(-4)}`
+      } else {
+        preview = '••••••••'
+      }
+    }
+    result[k] = { configured, preview }
+  }
+
+  return result
+}
+

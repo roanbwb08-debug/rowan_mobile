@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
 import { sanitizeGeminiModel } from './generation.js'
+import { getApiKeyFromSupabaseOrEnv } from '../supabase.js'
 
 export interface ResearchSource {
   title: string
@@ -55,8 +56,8 @@ export async function performWebResearch(
   }
 
   const providerPreference = (process.env.PRIMARY_RESEARCH_PROVIDER ?? 'tavily').toLowerCase()
-  const tavilyKey = process.env.TAVILY_API_KEY
-  const geminiKey = process.env.GEMINI_API_KEY
+  const tavilyKey = await getApiKeyFromSupabaseOrEnv('TAVILY_API_KEY')
+  const geminiKey = await getApiKeyFromSupabaseOrEnv('GEMINI_API_KEY')
 
   const trimmedQuery = (query || '').trim()
   if (!trimmedQuery || trimmedQuery.length < 2) {
@@ -170,7 +171,7 @@ export async function performWebResearch(
  * Execute grounding with Google Search via official @google/genai SDK
  */
 async function performGeminiSearchGrounding(query: string): Promise<ResearchResult> {
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = await getApiKeyFromSupabaseOrEnv('GEMINI_API_KEY')
   if (!apiKey) {
     return {
       success: false,
