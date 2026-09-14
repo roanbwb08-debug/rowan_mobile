@@ -1,28 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import {
-  ArrowLeft,
   Mic,
   MicOff,
   Square,
-  Activity,
-  ChevronDown,
-  ChevronUp,
   Terminal,
   Globe,
   X,
-  BookOpen,
-  Newspaper
+  Camera,
+  Monitor
 } from 'lucide-react'
-import { RowanLiveVoiceOrb, type RealtimeVoiceOrbState } from './RowanLiveVoiceOrb'
 import { RowanWebsitePreview } from './RowanWebsitePreview'
-import type { RowanAvatarState } from '../types'
+import { RowanLiveVoiceOrb } from './RowanLiveVoiceOrb'
 import type { VoiceDiagnostic } from '../hooks/useRealtimeVoice'
 
 interface RowanLiveVoiceViewProps {
   status: string
   isListening: boolean
   isSpeaking: boolean
+  isThinking?: boolean
+  isInterrupted?: boolean
   isSearching: boolean
   searchQuery?: string | null
   transcript?: string
@@ -37,55 +34,49 @@ interface RowanLiveVoiceViewProps {
   activePreview?: { url: string; title?: string } | null
   onClosePreview?: () => void
   onOpenWebsite?: (url: string, title?: string) => void
+  // Unified Camera & Screen Sharing Props
+  isScreenSharing?: boolean
+  liveStreamType?: 'screen' | 'camera' | null
+  onStartScreenShare?: () => void
+  onStopScreenShare?: () => void
+  onStartCameraShare?: (facingMode: 'user' | 'environment') => void
 }
 
 export const RowanLiveVoiceView: React.FC<RowanLiveVoiceViewProps> = ({
-  status,
   isListening,
   isSpeaking,
+  isThinking,
+  isInterrupted,
   isSearching,
   searchQuery,
+  transcript,
   error,
   isMuted,
   onToggleMute,
   onStop,
   onBackToChat,
   theme = 'dark',
-  activeConversationLock = false,
   diagnostics = [],
   activePreview = null,
   onClosePreview,
-  onOpenWebsite
+  onOpenWebsite,
+  isScreenSharing = false,
+  liveStreamType = null,
+  onStartScreenShare,
+  onStopScreenShare,
+  onStartCameraShare
 }) => {
-  const isDark = theme === 'dark'
   const [showConsole, setShowConsole] = useState(false)
   const [showWebSearchInput, setShowWebSearchInput] = useState(false)
   const [customUrlInput, setCustomUrlInput] = useState('')
   const consoleEndRef = useRef<HTMLDivElement>(null)
 
-  // Map Realtime state directly to Rowan Expressive Avatar states
-  let avatarState: RowanAvatarState = 'idle'
-  let sublabel = 'Listening...'
-
-  if (error) {
-    avatarState = 'error'
-    sublabel = error
-  } else if (isSearching) {
-    avatarState = 'processing'
-    sublabel = searchQuery ? `Searching: "${searchQuery}"` : 'Rowan is researching...'
-  } else if (isSpeaking) {
-    avatarState = 'speaking'
-    sublabel = 'Speaking...'
-  } else if (status === 'interrupted') {
-    avatarState = 'interrupted'
-    sublabel = 'Interrupted'
-  } else if (isListening) {
-    avatarState = 'listening'
-    sublabel = isMuted ? 'Microphone muted' : 'Listening...'
-  } else if (status === 'thinking' || status === 'processing') {
-    avatarState = 'thinking'
-    sublabel = 'Thinking...'
-  }
+  // Map state to human-readable tag
+  let stateTag = 'THINKING'
+  if (error) stateTag = 'ERROR'
+  else if (isSearching) stateTag = 'RESEARCHING'
+  else if (isSpeaking) stateTag = 'SPEAKING'
+  else if (isListening) stateTag = 'LISTENING'
 
   // Auto-scroll diagnostics console to top when new events arrive
   useEffect(() => {
@@ -111,94 +102,37 @@ export const RowanLiveVoiceView: React.FC<RowanLiveVoiceViewProps> = ({
   }
 
   return (
-    <div
-      className={`relative flex flex-col justify-between items-center h-full w-full p-3 sm:p-5 select-none transition-colors duration-300 overflow-hidden ${
-        isDark ? 'bg-slate-950 text-white' : 'bg-white text-zinc-900'
-      }`}
-    >
-      {/* 1. TOP STATUS BAR */}
-      <div className="w-full flex items-center justify-between z-10 flex-shrink-0">
-        <button
-          type="button"
-          onClick={onBackToChat}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
-            isDark
-              ? 'bg-slate-900/80 text-slate-300 hover:text-white border border-slate-800'
-              : 'bg-zinc-100 text-zinc-700 hover:text-zinc-900 border border-zinc-200'
-          }`}
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Chat Mode</span>
-        </button>
-
-        <div className="flex flex-col items-center">
-          <span className="text-[10px] font-black tracking-widest text-blue-400 uppercase">ROWAN AI</span>
-          <h2 className="text-xs sm:text-sm font-black tracking-tight text-white flex items-center gap-1.5 mt-0.5">
-            <span className="flex h-2 w-2 relative">
-              <span
-                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                  isSpeaking ? 'bg-blue-400' : isListening ? 'bg-emerald-400' : 'bg-cyan-400'
-                }`}
-              />
-              <span
-                className={`relative inline-flex rounded-full h-2 w-2 ${
-                  isSpeaking ? 'bg-blue-500' : isListening ? 'bg-emerald-500' : 'bg-cyan-500'
-                }`}
-              />
-            </span>
-            <span>{sublabel}</span>
-          </h2>
-
-          {/* Active Conversation Lock Badge */}
-          <AnimatePresence>
-            {activeConversationLock && (
-              <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="mt-1 flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400 uppercase tracking-widest"
-              >
-                <Activity className="w-2.5 h-2.5 animate-pulse text-emerald-400" />
-                <span>Priority Lock Active</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+    <div className="relative flex flex-col justify-between items-center h-full w-full p-4 sm:p-6 select-none bg-[#080c14] text-white overflow-hidden font-sans">
+      
+      {/* 1. MOCKUP TITLE HEADER BAR */}
+      <div className="w-full flex items-center justify-between z-10 flex-shrink-0 border-b border-zinc-800/60 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#0cd5b1] animate-pulse shadow-[0_0_10px_rgba(12,213,177,0.8)]" />
+          <span className="text-xs font-black tracking-widest text-[#0cd5b1]">ROWAN LIVE VOICE</span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-4 text-xs font-bold text-zinc-400">
           <button
             type="button"
-            onClick={() => setShowWebSearchInput(!showWebSearchInput)}
-            className={`p-2 rounded-full border transition-colors cursor-pointer ${
-              showWebSearchInput
-                ? 'bg-blue-600 border-blue-500 text-white'
-                : isDark
-                ? 'bg-slate-900/80 border-slate-800 text-slate-300 hover:text-white'
-                : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:text-zinc-900'
-            }`}
-            title="Open Website Input"
+            onClick={() => setShowConsole(!showConsole)}
+            className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
           >
-            <Globe className="w-3.5 h-3.5" />
+            <Terminal className="w-3.5 h-3.5 text-blue-400" />
+            <span>Telemetry</span>
           </button>
-
+          
           <button
             type="button"
-            onClick={onToggleMute}
-            className={`p-2 rounded-full border transition-colors cursor-pointer ${
-              isMuted
-                ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
-                : isDark
-                ? 'bg-slate-900/80 border-slate-800 text-slate-300 hover:text-white'
-                : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:text-zinc-900'
-            }`}
-            title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+            onClick={onBackToChat}
+            className="hover:text-white transition-colors p-1 cursor-pointer"
+            title="Close Voice View"
           >
-            {isMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* WEB SEARCH & OPEN URL BAR IN VOICE MODE */}
+      {/* WEB SEARCH & OPEN URL BAR */}
       <AnimatePresence>
         {showWebSearchInput && (
           <motion.form
@@ -206,14 +140,14 @@ export const RowanLiveVoiceView: React.FC<RowanLiveVoiceViewProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             onSubmit={handleLaunchUrl}
-            className="w-full max-w-md my-2 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-blue-500/40 z-20 shadow-xl"
+            className="w-full max-w-md my-2 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-[#0cd5b1]/40 z-20 shadow-xl"
           >
             <Globe className="w-4 h-4 text-blue-400 flex-shrink-0" />
             <input
               type="text"
               value={customUrlInput}
               onChange={(e) => setCustomUrlInput(e.target.value)}
-              placeholder="Enter website URL (e.g., bbc.com or wikipedia.org)..."
+              placeholder="Enter website URL (e.g., wikipedia.org)..."
               className="flex-grow bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none"
             />
             <button
@@ -233,7 +167,7 @@ export const RowanLiveVoiceView: React.FC<RowanLiveVoiceViewProps> = ({
         )}
       </AnimatePresence>
 
-      {/* 2. ACTIVE WEBSITE PREVIEW LAYER IN VOICE MODE */}
+      {/* 2. ACTIVE WEBSITE PREVIEW LAYER */}
       {activePreview ? (
         <div className="relative w-full flex-grow my-2 rounded-2xl overflow-hidden border border-blue-500/30 bg-slate-900 shadow-2xl flex flex-col z-20">
           <RowanWebsitePreview
@@ -249,65 +183,100 @@ export const RowanLiveVoiceView: React.FC<RowanLiveVoiceViewProps> = ({
           />
         </div>
       ) : (
-        /* 3. CENTER STAGE: LARGE EXPRESSIVE ROWAN AVATAR WITH EXPRESSIONS */
+        /* 3. CENTER STAGE */
         <div className="flex flex-col items-center justify-center my-auto py-2 w-full flex-grow">
-          {/* Breathing halo background */}
-          <div className="relative mb-2 flex items-center justify-center">
+          
+          {/* Pulsing Badge: STATE: LISTENING */}
+          <div className="mb-6 px-4 py-1.5 rounded-full border border-[#0cd5b1]/40 bg-[#0cd5b1]/5 text-[10px] sm:text-xs font-black tracking-widest text-[#0cd5b1] flex items-center gap-1.5 shadow-[0_0_15px_rgba(12,213,177,0.1)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#0cd5b1] animate-ping" />
+            <span>STATE: {stateTag}</span>
+          </div>
+
+          {/* Rowan Live Voice Orb with compact listening state and clear visual feedback */}
+          <div className="relative flex items-center justify-center my-2">
             <RowanLiveVoiceOrb
-              state={status as RealtimeVoiceOrbState}
+              state={
+                isInterrupted
+                  ? 'interrupted'
+                  : isSpeaking
+                  ? 'speaking'
+                  : isThinking || isSearching
+                  ? 'thinking'
+                  : 'listening'
+              }
+              size={140}
               isListening={isListening}
               isSpeaking={isSpeaking}
-              isThinking={avatarState === 'thinking' || avatarState === 'processing'}
-              isInterrupted={status === 'interrupted'}
-              size={135}
-              theme={theme}
+              isThinking={isThinking || isSearching}
+              isInterrupted={isInterrupted}
               showStatusBadge={false}
+              theme={theme}
             />
           </div>
 
-          {/* Dynamic status title */}
-          <h3
-            className={`text-base sm:text-lg font-black tracking-tight mt-2 text-center transition-colors duration-300 ${
-              status === 'interrupted'
-                ? 'text-amber-400'
-                : isDark
-                ? 'text-white'
-                : 'text-zinc-900'
-            }`}
-          >
-            {status === 'interrupted'
-              ? 'Interrupted...'
-              : isSpeaking
-              ? 'Rowan is speaking...'
-              : isSearching
-              ? 'Researching the web...'
-              : isListening
-              ? 'Listening to you...'
-              : 'How can I help you today?'}
-          </h3>
+          {/* Quick toggle capsules from mockup image */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5 w-full max-w-sm mt-6">
+            <button
+              type="button"
+              onClick={() => {
+                if (onStartCameraShare) onStartCameraShare('user')
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                liveStreamType === 'camera' && isScreenSharing
+                  ? 'bg-[#0cd5b1]/15 border-[#0cd5b1] text-[#0cd5b1] shadow-[0_0_12px_rgba(12,213,177,0.2)]'
+                  : 'bg-zinc-900/60 hover:bg-zinc-850 border-zinc-800 text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>Front Cam</span>
+            </button>
 
-          {/* Subtitle / Live Transcript Display */}
-          <div className="mt-1 max-w-sm px-4 min-h-[36px] flex items-center justify-center text-center">
-            <p className={`text-xs font-medium transition-all duration-300 ${
-              isDark ? 'text-zinc-400' : 'text-zinc-500'
-            }`}>
-              {sublabel || 'Speak naturally. Rowan listens and opens websites while explaining.'}
-            </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (onStartCameraShare) onStartCameraShare('environment')
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                liveStreamType === 'camera' && isScreenSharing
+                  ? 'bg-[#0cd5b1]/15 border-[#0cd5b1] text-[#0cd5b1] shadow-[0_0_12px_rgba(12,213,177,0.2)]'
+                  : 'bg-zinc-900/60 hover:bg-zinc-850 border-zinc-800 text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>Back Cam</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (isScreenSharing && liveStreamType === 'screen') {
+                  if (onStopScreenShare) onStopScreenShare()
+                } else {
+                  if (onStartScreenShare) onStartScreenShare()
+                }
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                isScreenSharing && liveStreamType === 'screen'
+                  ? 'bg-blue-500/15 border-blue-400 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.25)]'
+                  : 'bg-zinc-900/60 hover:bg-zinc-850 border-zinc-800 text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              <span>Share Screen</span>
+            </button>
           </div>
 
-          {/* Voice reactive wave visualizer */}
-          <div className="flex items-center justify-center gap-1.5 mt-3 h-5">
+          {/* Voice reactive wave visualizer bars */}
+          <div className="flex items-center justify-center gap-1 mt-6 h-5">
             {[0.4, 0.7, 1.2, 0.9, 1.4, 0.8, 1.1, 0.6, 0.3].map((mult, idx) => (
               <motion.div
                 key={idx}
                 className={`w-1 rounded-full ${
-                  status === 'interrupted'
-                    ? 'bg-amber-500/60 shadow-[0_0_6px_rgba(245,158,11,0.5)]'
-                    : isSpeaking
-                    ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]'
-                    : isListening
-                    ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
-                    : 'bg-zinc-500/40'
+                  isSpeaking
+                    ? 'bg-blue-400 shadow-[0_0_8px_rgba(56,189,248,0.7)]'
+                    : isListening && !isMuted
+                    ? 'bg-[#0cd5b1] shadow-[0_0_8px_rgba(12,213,177,0.6)]'
+                    : 'bg-zinc-700'
                 }`}
                 animate={{
                   height:
@@ -316,115 +285,95 @@ export const RowanLiveVoiceView: React.FC<RowanLiveVoiceViewProps> = ({
                       : 5
                 }}
                 transition={{
-                  duration: 0.7 + idx * 0.06,
+                  duration: 0.6 + idx * 0.05,
                   repeat: Infinity,
                   ease: 'easeInOut',
-                  delay: idx * 0.05
+                  delay: idx * 0.04
                 }}
               />
             ))}
           </div>
 
-          {/* QUICK WEBSITE LAUNCH BUTTONS DIRECTLY IN LIVE VOICE MODE */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 max-w-xs">
-            <button
-              type="button"
-              onClick={() => onOpenWebsite && onOpenWebsite('https://news.google.com', 'Google News')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-[10px] font-bold text-slate-300 hover:text-white transition-all cursor-pointer"
-            >
-              <Newspaper className="w-3 h-3 text-blue-400" />
-              <span>Latest News</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onOpenWebsite && onOpenWebsite('https://en.wikipedia.org', 'Wikipedia')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-[10px] font-bold text-slate-300 hover:text-white transition-all cursor-pointer"
-            >
-              <BookOpen className="w-3 h-3 text-amber-400" />
-              <span>Wikipedia</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onOpenWebsite && onOpenWebsite('https://bbc.com/news', 'BBC News')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-[10px] font-bold text-slate-300 hover:text-white transition-all cursor-pointer"
-            >
-              <Globe className="w-3 h-3 text-emerald-400" />
-              <span>BBC World</span>
-            </button>
+          {/* Status text outline box from mockup image */}
+          <div className="w-full max-w-sm mt-5 p-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 backdrop-blur-md flex items-center justify-center text-center min-h-[64px]">
+            <p className="text-xs sm:text-sm font-medium text-zinc-300 leading-relaxed">
+              {transcript || (error ? `Error: ${error}` : isSpeaking ? 'Rowan is speaking...' : isSearching ? `Searching: "${searchQuery || 'the web'}..."` : 'Listening... speak naturally to Rowan / Arlo.')}
+            </p>
           </div>
+
+          {/* Interrupt instructional note */}
+          <p className="text-[10px] sm:text-xs text-zinc-500 mt-4 text-center">
+            Speak anytime to interrupt, or say <span className="text-[#0cd5b1] font-semibold">"stop"</span> to pause speech instantly.
+          </p>
         </div>
       )}
 
-      {/* 4. DIAGNOSTICS LOGGING CONSOLE (DEVELOPER-ONLY, COMPACT & BEAUTIFUL) */}
-      {diagnostics.length > 0 && (
-        <div className="w-full max-w-sm mb-2 z-20 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowConsole(!showConsole)}
-            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-              isDark
-                ? 'bg-slate-900/60 hover:bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200 text-zinc-500 hover:text-zinc-700'
-            }`}
+      {/* 4. DIAGNOSTICS LOGGING CONSOLE */}
+      <AnimatePresence>
+        {showConsole && diagnostics.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 110, opacity: 1 }}
+            exit={{ opacity: 0, height: 0 }}
+            className="w-full max-w-sm mb-3 z-20 flex-shrink-0 overflow-hidden border border-zinc-800 rounded-xl bg-zinc-950/95 text-[9px] font-mono leading-relaxed flex flex-col"
           >
-            <div className="flex items-center gap-1.5">
-              <Terminal className="w-3 h-3 text-blue-400" />
-              <span>Real-Time Diagnostics</span>
-            </div>
-            {showConsole ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-          </button>
-
-          <AnimatePresence>
-            {showConsole && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 100, opacity: 1 }}
-                exit={{ opacity: 0, height: 0 }}
-                className={`overflow-hidden border-x border-b rounded-b-lg text-[9px] font-mono leading-relaxed transition-all flex flex-col ${
-                  isDark
-                    ? 'bg-slate-950/90 border-slate-800 text-slate-300'
-                    : 'bg-zinc-50/95 border-zinc-200 text-zinc-800'
-                }`}
-              >
-                <div className="overflow-y-auto p-2 space-y-1.5 flex-1 scrollbar-thin">
-                  <div ref={consoleEndRef} />
-                  {diagnostics.map((diag, index) => (
-                    <div key={index} className="flex items-start gap-1">
-                      <span className="text-zinc-500 shrink-0 select-none">[{diag.timestamp}]</span>
-                      <span className={`font-semibold shrink-0 select-none ${
-                        diag.type === 'success' ? 'text-emerald-400' :
-                        diag.type === 'warning' ? 'text-amber-400' :
-                        diag.type === 'error' ? 'text-rose-400' : 'text-blue-400'
-                      }`}>
-                        {diag.event}:
-                      </span>
-                      <span className="text-zinc-400">{diag.message}</span>
-                    </div>
-                  ))}
+            <div className="overflow-y-auto p-2 space-y-1 flex-1 scrollbar-thin text-zinc-300">
+              <div ref={consoleEndRef} />
+              {diagnostics.map((diag, index) => (
+                <div key={index} className="flex items-start gap-1">
+                  <span className="text-zinc-600 shrink-0 select-none">[{diag.timestamp}]</span>
+                  <span className={`font-semibold shrink-0 select-none ${
+                    diag.type === 'success' ? 'text-emerald-400' :
+                    diag.type === 'warning' ? 'text-amber-400' :
+                    diag.type === 'error' ? 'text-rose-400' : 'text-blue-400'
+                  }`}>
+                    {diag.event}:
+                  </span>
+                  <span className="text-zinc-400">{diag.message}</span>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* 5. BOTTOM ACTION BAR: TAP TO STOP & CONTROLS */}
-      <div className="w-full flex flex-col items-center gap-2 z-10 flex-shrink-0">
+      {/* 5. BOTTOM ACTION CONTROLS */}
+      <div className="w-full flex items-center justify-center gap-3.5 z-10 flex-shrink-0 border-t border-zinc-800/60 pt-4 mt-1">
+        
+        {/* Mic Toggle circle button */}
+        <button
+          type="button"
+          onClick={onToggleMute}
+          className={`w-11 h-11 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+            isMuted
+              ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+              : 'bg-zinc-950/60 hover:bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white'
+          }`}
+          title={isMuted ? 'Unmute Mic' : 'Mute Mic'}
+        >
+          {isMuted ? <MicOff className="w-4.5 h-4.5" /> : <Mic className="w-4.5 h-4.5" />}
+        </button>
+
+        {/* End Voice Session crimson button */}
         <button
           type="button"
           onClick={onStop}
-          className="flex items-center justify-center gap-2.5 px-6 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs sm:text-sm shadow-xl hover:shadow-[0_0_25px_rgba(225,29,72,0.4)] transition-all cursor-pointer w-full max-w-xs"
+          className="px-6 py-2.5 rounded-full bg-[#e11d48] hover:bg-rose-500 text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-[0_4px_20px_rgba(225,29,72,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
         >
-          <Square className="w-4 h-4 fill-white" />
-          <span>Tap to stop</span>
+          <Square className="w-3.5 h-3.5 fill-white" />
+          <span>End Voice Session</span>
         </button>
 
-        <p className={`text-[10px] font-medium text-center ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-          Speak naturally or open websites while Rowan explains
-        </p>
+        {/* Open in Chat button */}
+        <button
+          type="button"
+          onClick={onBackToChat}
+          className="px-4 py-2.5 rounded-full border border-zinc-800 bg-zinc-950/40 hover:bg-zinc-900 text-xs font-black text-zinc-300 hover:text-white transition-all cursor-pointer"
+        >
+          Open in Chat
+        </button>
       </div>
+
     </div>
   )
 }

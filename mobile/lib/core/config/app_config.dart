@@ -21,8 +21,11 @@ class AppConfig {
 
   static const String backendUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: kIsWeb ? '' : 'http://10.0.2.2:3000',
+    defaultValue: 'https://ais-dev-dbnaawdtjsq3njql2j2tar-863840080199.europe-west2.run.app',
   );
+
+  /// Local development fallback for Android emulator testing.
+  static const String localEmulatorFallbackUrl = 'http://10.0.2.2:3000';
 
   static bool get isConfigured =>
       supabaseUrl.isNotEmpty &&

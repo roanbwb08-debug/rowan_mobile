@@ -2,6 +2,7 @@ import { ConversationContext, TaskPlan, TaskStep } from './types.js'
 import { availableTools } from './tools.js'
 import { buildDynamicSystemInstruction } from '../../rowan.js'
 import { ProviderManager } from './providers.js'
+import { isExplicitAdultQuery } from './research.js'
 
 // Helper to check if a query is simple conversational chitchat (greetings, identity, gratitude)
 function isChitchat(message: string): boolean {
@@ -110,8 +111,10 @@ export class RowanOrchestrator {
     // Trigger web research if enableSearch is explicitly true,
     // OR if there is an explicit research keyword,
     // OR if it's not a chitchat and not a store action (and enableSearch !== false)
-    const shouldResearch = enableSearch === true || 
-      (enableSearch !== false && (hasResearchKeyword || (!isStoreAction && !isChitchat(userMessage))))
+    // NEVER research adult/pornographic content
+    const isAdultQuery = isExplicitAdultQuery(userMessage)
+    const shouldResearch = !isAdultQuery && (enableSearch === true || 
+      (enableSearch !== false && (hasResearchKeyword || (!isStoreAction && !isChitchat(userMessage)))))
 
     if (shouldResearch) {
       capabilities.push('webResearch')

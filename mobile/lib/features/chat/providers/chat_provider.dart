@@ -97,6 +97,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
     }
   }
+
+  void startNewSession() {
+    _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    state = ChatState(messages: [
+      ChatMessage(role: 'assistant', text: 'Hello! I am Rowan. How can I help you today?')
+    ]);
+  }
+
+  void loadSession(String sessionId, List<ChatMessage> history) {
+    _sessionId = sessionId;
+    state = ChatState(messages: history);
+  }
 }
 
 final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {

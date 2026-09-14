@@ -5,14 +5,19 @@ import { getApiKeyFromSupabaseOrEnv } from '../supabase.js'
 
 let isOpenAIQuotaExhausted = false
 let lastOpenAIQuotaCheck = 0
+let isOpenAIUnauthorized = false
 
 export function isOpenAIExhausted(): boolean {
-  return isOpenAIQuotaExhausted
+  return isOpenAIQuotaExhausted || isOpenAIUnauthorized
 }
 
 export function markOpenAIQuotaExhausted(): void {
   isOpenAIQuotaExhausted = true
   lastOpenAIQuotaCheck = Date.now()
+}
+
+export function markOpenAIUnauthorized(): void {
+  isOpenAIUnauthorized = true
 }
 
 export async function checkOpenAIQuotaStatus(apiKey?: string): Promise<boolean> {
@@ -146,8 +151,13 @@ export class OpenAIProvider implements AIProvider {
           content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>
         }> = []
 
-        if (options?.systemInstruction) {
-          messages.push({ role: 'system', content: options.systemInstruction })
+        let sysInstr = options?.systemInstruction || ''
+        if (options?.responseMimeType === 'application/json' && !sysInstr.toLowerCase().includes('json') && !prompt.toLowerCase().includes('json')) {
+          sysInstr = (sysInstr ? `${sysInstr}\n` : '') + 'Respond in valid JSON format.'
+        }
+
+        if (sysInstr) {
+          messages.push({ role: 'system', content: sysInstr })
         }
 
         if (options?.screenFrame) {
@@ -195,9 +205,15 @@ export class OpenAIProvider implements AIProvider {
           let category: ProviderError['category'] = 'unknown'
 
           if (status === 401 || status === 403) {
-            isRecoverable = false
+            markOpenAIQuotaExhausted()
+            markOpenAIUnauthorized()
+            isRecoverable = true // System can recover via fallback to Gemini!
             category = 'unauthorized'
+          } else if (status === 400 || status === 422) {
+            category = 'fatal'
+            isRecoverable = true // System can recover via fallback to Gemini!
           } else if (status === 429) {
+            markOpenAIQuotaExhausted()
             const isQuotaExhausted = errText.toLowerCase().includes('quota') || errText.toLowerCase().includes('credit_balance_exhausted')
             category = isQuotaExhausted ? 'quota-exhausted' : 'rate-limit'
             isRecoverable = true // Recoverable via fallback provider!
@@ -292,7 +308,10 @@ export class GeminiProvider implements AIProvider {
       primaryModel,
       'gemini-3.7-flash',
       'gemini-3.1-flash-lite',
-      'gemini-3.8-flash'
+      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-1.5-flash'
     ]
     const uniqueModels = Array.from(new Set(fallbackModels))
 
@@ -395,6 +414,16 @@ export class ProviderManager {
     gemini: { providerId: 'gemini', consecutiveFailures: 0 }
   }
 
+  private getHealthState(providerId: string): ProviderHealthState {
+    if (!this.healthStates[providerId]) {
+      this.healthStates[providerId] = {
+        providerId,
+        consecutiveFailures: 0
+      }
+    }
+    return this.healthStates[providerId]
+  }
+
   // Cooldown rules
   private COOLDOWN_DURATION_MS = 45000 // 45 seconds cooldown before retrying a failing provider
 
@@ -402,42 +431,37 @@ export class ProviderManager {
    * Determine primary and backup provider mapping based on ENV or default
    */
   private getProviderConfiguration(): { primaryId: string; backupId: string } {
-    const rawPrimary = (process.env.PRIMARY_AI_PROVIDER || '').trim().toLowerCase()
-    const rawBackup = (process.env.BACKUP_AI_PROVIDER || '').trim().toLowerCase()
-
-    let primaryId = 'gemini'
-    let backupId = rawBackup === 'openai' ? 'openai' : 'gemini'
-
-    // If OpenAI has exhausted credits, route both primary and backup through Gemini to prevent 429 quota exceptions
-    if (isOpenAIQuotaExhausted) {
+    if (isOpenAIQuotaExhausted || isOpenAIUnauthorized) {
       return { primaryId: 'gemini', backupId: 'gemini' }
     }
 
-    if (rawPrimary === 'openai') {
-      primaryId = 'openai'
-      backupId = rawBackup === 'openai' ? 'gemini' : (rawBackup || 'gemini')
-    } else if (rawPrimary === 'gemini') {
-      primaryId = 'gemini'
-      backupId = rawBackup === 'gemini' ? 'openai' : (rawBackup || 'openai')
-    } else {
-      // Default: If Gemini is available, use gemini as primary for optimal speed & reliability in AI Studio
-      if (process.env.GEMINI_API_KEY) {
-        primaryId = 'gemini'
-        backupId = 'openai'
-      } else if (process.env.OPENAI_API_KEY) {
-        primaryId = 'openai'
-        backupId = 'gemini'
-      }
+    const validProviders = ['gemini', 'openai']
+    let rawPrimary = (process.env.PRIMARY_AI_PROVIDER || '').trim().toLowerCase()
+    let rawBackup = (process.env.BACKUP_AI_PROVIDER || '').trim().toLowerCase()
+
+    if (!validProviders.includes(rawPrimary)) {
+      rawPrimary = process.env.GEMINI_API_KEY ? 'gemini' : 'openai'
     }
 
-    return { primaryId, backupId }
+    if (!validProviders.includes(rawBackup)) {
+      rawBackup = rawPrimary === 'openai' ? 'gemini' : 'openai'
+    }
+
+    if (rawPrimary === rawBackup) {
+      rawBackup = rawPrimary === 'openai' ? 'gemini' : 'openai'
+    }
+
+    return { primaryId: rawPrimary, backupId: rawBackup }
   }
 
   /**
    * Resolve instances by ID
    */
   private getProviderInstance(id: string): AIProvider {
-    return id === 'gemini' ? this.geminiProvider : this.openaiProvider
+    if (id === 'openai') {
+      return this.openaiProvider
+    }
+    return this.geminiProvider
   }
 
   /**
@@ -460,7 +484,7 @@ export class ProviderManager {
     let selectedId = config.primaryId
     let isFallbackActive = false
 
-    const primaryState = this.healthStates[config.primaryId]
+    const primaryState = this.getHealthState(config.primaryId)
     const now = Date.now()
 
     // 1. Circuit breaker check: If primary is on cooldown and backup exists, use backup directly
@@ -482,7 +506,7 @@ export class ProviderManager {
       })
 
       // Success! Reset health state on success
-      const state = this.healthStates[selectedId]
+      const state = this.getHealthState(selectedId)
       state.consecutiveFailures = 0
       state.cooldownUntil = undefined
       state.lastFailureTime = undefined
@@ -509,7 +533,7 @@ export class ProviderManager {
       console.error(`[PROVIDERS-LOG] FAILURE: provider=${selectedId} status=failed latency=${latency}ms error_category=${errorCategory} error_message="${errMsg}"`)
 
       // Update failure tracking for the provider that failed
-      const state = this.healthStates[selectedId]
+      const state = this.getHealthState(selectedId)
       state.consecutiveFailures++
       state.lastFailureTime = now
       
@@ -526,10 +550,14 @@ export class ProviderManager {
 
       // 2. Perform Fallback to the alternative provider if we haven't already fallen back
       if (!isFallbackActive) {
-        const fallbackId = config.backupId
+        const updatedConfig = this.getProviderConfiguration()
+        let fallbackId = updatedConfig.backupId
+        if (fallbackId === selectedId || !['gemini', 'openai'].includes(fallbackId)) {
+          fallbackId = selectedId === 'openai' ? 'gemini' : 'openai'
+        }
         console.warn(`[PROVIDERS] Attempting automatic fallback from '${config.primaryId}' to '${fallbackId}'...`)
 
-        const fallbackState = this.healthStates[fallbackId]
+        const fallbackState = this.getHealthState(fallbackId)
         if (fallbackState.cooldownUntil && now < fallbackState.cooldownUntil) {
           throw new Error(`Fallback provider '${fallbackId}' is also currently on cooldown. All AI providers unavailable.`, { cause: err })
         }

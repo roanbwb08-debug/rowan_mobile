@@ -4,6 +4,7 @@ import { GoogleGenAI } from '@google/genai'
 import OpenAI from 'openai'
 import multer from 'multer'
 import fs from 'fs'
+import { isExplicitAdultQuery } from '../services/ai/research.js'
 
 const router = Router()
 const upload = multer({ dest: '/tmp/' })
@@ -313,11 +314,11 @@ export async function generateImageContent(
   if (aspectRatio === '9:16') size = '1024x1792'
 
   const requestPayload = {
-    model: 'chatgpt-image-latest',
+    model: 'dall-e-3',
     prompt: enhancedPrompt,
     n: 1,
     size,
-    quality: 'high' as const
+    quality: 'standard' as const
   }
 
   console.log(`[IMAGE PIPELINE] 4. API REQUEST -> OpenAI Endpoint: https://api.openai.com/v1/images/generations`)
@@ -328,9 +329,14 @@ export async function generateImageContent(
     try {
       response = await openai.images.generate(requestPayload)
     } catch (e) {
-      console.log(`[IMAGE PIPELINE] Note: chatgpt-image-latest call note -> gpt-image-2 retry (${e instanceof Error ? e.message : String(e)})`)
-      requestPayload.model = 'gpt-image-2'
-      response = await openai.images.generate(requestPayload)
+      console.log(`[IMAGE PIPELINE] Note: dall-e-3 call note -> dall-e-2 retry (${e instanceof Error ? e.message : String(e)})`)
+      const dallE2Payload = {
+        model: 'dall-e-2',
+        prompt: enhancedPrompt.slice(0, 1000),
+        n: 1,
+        size: '1024x1024' as const
+      }
+      response = await openai.images.generate(dallE2Payload)
     }
 
     const imageUrl = response.data[0]?.url
@@ -384,6 +390,13 @@ router.post('/generate', async (req, res) => {
     })
   }
 
+  if (isExplicitAdultQuery(parsed.data.prompt)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Rowan cannot generate images containing explicit adult or pornographic content.'
+    })
+  }
+
   try {
     const result = await generateImageContent(
       parsed.data.prompt,
@@ -433,7 +446,7 @@ router.post('/raw-test', async (req, res) => {
         actualModel: result.provider,
         exactApiRequest: {
           endpoint: preferredProvider === 'flux' ? 'https://image.pollinations.ai' : 'https://api.openai.com/v1/images/generations',
-          model: preferredProvider === 'flux' ? 'flux' : 'chatgpt-image-latest',
+          model: preferredProvider === 'flux' ? 'flux' : 'dall-e-3',
           size: '1024x1024',
           quality: 'high',
           prompt: result.enhancedPrompt

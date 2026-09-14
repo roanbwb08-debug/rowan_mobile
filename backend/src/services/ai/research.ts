@@ -37,6 +37,22 @@ function isRateLimited(sessionId: string): boolean {
   return current.count > 10
 }
 
+export function isExplicitAdultQuery(query: string): boolean {
+  const lower = query.toLowerCase()
+  const patterns = [
+    /\bporns?\b/, /\bporno(graphy)?\b/, /\bpornhub\b/, /\bxvideos\b/, /\bxnxx\b/, /\bredtube\b/,
+    /\byouporn\b/, /\bxhamster\b/, /\bhentai\b/, /\bxxx\b/, /\bnsfw\b/,
+    /\bsex(ual)?\s+(video|movie|clip|film|content)s?\b/,
+    /\berotic\s+(video|movie|clip|film|content)s?\b/,
+    /\bnude\s+(video|movie|clip|film|picture|photo|content)s?\b/,
+    /\badult\s+(video|movie|clip|film|content|site|entertainment)s?\b/,
+    /\bhardcore\s+(video|movie|clip|film|content)s?\b/,
+    /\bexplicit\s+(video|movie|clip|film|content)s?\b/,
+    /\bonlyfans\s+(leaks?|content|nudes?)\b/
+  ]
+  return patterns.some(pattern => pattern.test(lower))
+}
+
 /**
  * Execute web research via Tavily or Gemini Google Search Grounding
  */
@@ -55,10 +71,6 @@ export async function performWebResearch(
     }
   }
 
-  const providerPreference = (process.env.PRIMARY_RESEARCH_PROVIDER ?? 'tavily').toLowerCase()
-  const tavilyKey = await getApiKeyFromSupabaseOrEnv('TAVILY_API_KEY')
-  const geminiKey = await getApiKeyFromSupabaseOrEnv('GEMINI_API_KEY')
-
   const trimmedQuery = (query || '').trim()
   if (!trimmedQuery || trimmedQuery.length < 2) {
     console.warn(`[RESEARCH] Query is too short or empty for research: "${query}"`)
@@ -70,6 +82,21 @@ export async function performWebResearch(
       error: 'Query is empty or too short'
     }
   }
+
+  if (isExplicitAdultQuery(trimmedQuery)) {
+    console.warn(`[RESEARCH] Blocked explicit adult content search query: "${trimmedQuery}"`)
+    return {
+      success: false,
+      summary: 'I cannot perform web searches for adult, sexually explicit, or pornographic content.',
+      sources: [],
+      provider: 'safety-filter',
+      error: 'Adult content search blocked by safety policy'
+    }
+  }
+
+  const providerPreference = (process.env.PRIMARY_RESEARCH_PROVIDER ?? 'tavily').toLowerCase()
+  const tavilyKey = await getApiKeyFromSupabaseOrEnv('TAVILY_API_KEY')
+  const geminiKey = await getApiKeyFromSupabaseOrEnv('GEMINI_API_KEY')
 
   console.log(`[RESEARCH] Initiating research. Query: "${trimmedQuery}". Provider preference: ${providerPreference}`)
 

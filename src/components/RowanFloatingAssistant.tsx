@@ -177,6 +177,7 @@ export const RowanFloatingAssistant: React.FC<RowanFloatingAssistantProps> = ({ 
           isFloating={true}
           isMinimized={!isOpen}
           onClose={() => setIsOpen(false)}
+          onSetOpen={setIsOpen}
           onExpand={() => {
             if (hasMovedRef.current) return
             if (!isOpen) {

@@ -37,6 +37,7 @@ import { useTTS } from '../hooks/useTTS'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
 import { useRealtimeVoice } from '../hooks/useRealtimeVoice'
 import { useWakeWord } from '../hooks/useWakeWord'
+import { screenCaptureService } from '../services/screenCaptureService'
 import type { RowanAvatarState, ResearchSourceItem } from '../types'
 
 export interface Message {
@@ -82,6 +83,7 @@ interface RowanConversationalInterfaceProps {
   onThemeChange?: (theme: 'light' | 'dark') => void
   isFloating?: boolean
   onClose?: () => void
+  onSetOpen?: (open: boolean) => void
   onExpand?: () => void
   isExpanded?: boolean
   dragHandleProps?: {
@@ -101,6 +103,7 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
   isFloating = false,
   isMinimized = false,
   onClose,
+  onSetOpen,
   onExpand,
   isExpanded = false,
   dragHandleProps
@@ -158,15 +161,51 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
   const [liveStreamType, setLiveStreamType] = useState<'screen' | 'camera'>('screen')
   const [sharingModalTab, setSharingModalTab] = useState<'desktop' | 'mobile' | 'mac'>('desktop')
   const hiddenVideoRef = useRef<HTMLVideoElement | null>(null)
+  const activeStreamingMessageIdRef = useRef<string | null>(null)
 
-  // Clean up screen sharing stream on unmount
+  // Inactivity Security Auto-Disconnect System (20 minutes of silence/no user input)
+  const lastUserInteractionTimeRef = useRef<number>(0)
+  const resetInactivityTimer = () => {
+    lastUserInteractionTimeRef.current = Date.now()
+  }
+
+  // Initialize inactivity timer and register global interaction event listeners to monitor activity
   useEffect(() => {
-    return () => {
-      if (screenStream) {
-        screenStream.getTracks().forEach((track) => track.stop())
-      }
+    lastUserInteractionTimeRef.current = Date.now()
+
+    const handleInteraction = () => {
+      resetInactivityTimer()
     }
-  }, [screenStream])
+
+    window.addEventListener('click', handleInteraction, { passive: true })
+    window.addEventListener('keydown', handleInteraction, { passive: true })
+    window.addEventListener('mousemove', handleInteraction, { passive: true })
+    window.addEventListener('touchstart', handleInteraction, { passive: true })
+    window.addEventListener('scroll', handleInteraction, { passive: true })
+
+    return () => {
+      window.removeEventListener('click', handleInteraction)
+      window.removeEventListener('keydown', handleInteraction)
+      window.removeEventListener('mousemove', handleInteraction)
+      window.removeEventListener('touchstart', handleInteraction)
+      window.removeEventListener('scroll', handleInteraction)
+    }
+  }, [])
+
+  // Sync with global screenCaptureService to maintain active streams across navigation
+  useEffect(() => {
+    const unsubscribe = screenCaptureService.registerListener({
+      onStart: (stream) => {
+        setScreenStream(stream)
+        setIsScreenSharing(true)
+      },
+      onStop: () => {
+        setScreenStream(null)
+        setIsScreenSharing(false)
+      }
+    })
+    return () => unsubscribe()
+  }, [])
 
   // Realtime Voice Hook (subtle backend connection, zero provider branding exposed)
   const {
@@ -182,6 +221,51 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
     activeConversation,
     diagnostics
   } = useRealtimeVoice({
+    onTranscript: (text, isUser) => {
+      if (isUser) {
+        resetInactivityTimer()
+        activeStreamingMessageIdRef.current = null
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1]
+          if (lastMsg && lastMsg.role === 'user' && lastMsg.text === text) {
+            return prev
+          }
+          return [
+            ...prev,
+            {
+              id: getUniqueId('voice_user'),
+              role: 'user',
+              text
+            }
+          ]
+        })
+      } else {
+        setMessages((prev) => {
+          const streamId = activeStreamingMessageIdRef.current
+          if (streamId) {
+            return prev.map((msg) => {
+              if (msg.id === streamId) {
+                return { ...msg, text: msg.text + text }
+              }
+              return msg
+            })
+          } else {
+            const newId = getUniqueId('voice_assistant')
+            if (rtStatus === 'speaking' || rtStatus === 'thinking' || (rtStatus !== 'idle' && rtStatus !== 'error')) {
+              activeStreamingMessageIdRef.current = newId
+            }
+            return [
+              ...prev,
+              {
+                id: newId,
+                role: 'assistant',
+                text
+              }
+            ]
+          }
+        })
+      }
+    },
     onSearchComplete: (sources, query) => {
       // Map research findings directly into chat
       setMessages((prev) => [
@@ -213,6 +297,46 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
       return captureCurrentFrame()
     }
   })
+
+  // Clear streaming message ref when assistant is no longer speaking
+  useEffect(() => {
+    if (rtStatus !== 'speaking') {
+      activeStreamingMessageIdRef.current = null
+    }
+  }, [rtStatus])
+
+  // Inactivity Security Auto-Disconnect System (20 minutes of silence/no user input)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isScreenSharing || voiceModeActive) {
+        const inactiveMs = Date.now() - lastUserInteractionTimeRef.current
+        const timeoutMs = 20 * 60 * 1000 // 20 minutes
+        if (inactiveMs >= timeoutMs) {
+          console.log('[Rowan Security] 20 minutes of inactivity detected. Auto-disconnecting for safety.')
+          
+          if (screenStream) {
+            screenStream.getTracks().forEach((track) => track.stop())
+          }
+          setScreenStream(null)
+          setIsScreenSharing(false)
+          
+          rtStop()
+          setVoiceModeActive(false)
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: getUniqueId('security_timeout'),
+              role: 'assistant',
+              text: "🛡️ **Rowan Shield Activated:** Screen sharing and Live Voice Mode have been automatically disconnected due to 20 minutes of user inactivity to safeguard your security and privacy. Click the Rowan orb to reconnect when you are back!"
+            }
+          ])
+        }
+      }
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [isScreenSharing, voiceModeActive, screenStream, rtStop])
 
   
   const isRealtimeActive = rtStatus !== 'idle' && rtStatus !== 'error'
@@ -301,11 +425,11 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
     setIsSharePickerGuiding(true)
   }
 
-  const startCameraSharing = async () => {
+  const startCameraSharing = async (facingModeParam: 'user' | 'environment' = 'environment') => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { ideal: 'environment' },
+          facingMode: { ideal: facingModeParam },
           width: { ideal: 1280 },
           height: { ideal: 720 }
         },
@@ -317,12 +441,23 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
       setIsScreenSharing(true)
       setIsSharePickerGuiding(false)
 
+      // Auto-minimize the floating assistant container
+      if (onSetOpen) {
+        onSetOpen(false)
+      }
+
+      // Auto-start voice mode
+      if (!voiceModeActive && !isRealtimeActive) {
+        setVoiceModeActive(true)
+        rtStart().catch(console.error)
+      }
+
       setMessages((prev) => [
         ...prev,
         {
           id: getUniqueId('camera_system'),
           role: 'assistant',
-          text: "📷 **Live Camera Connected.** I can now view your surroundings or point your phone's camera at any screens, MacBooks, or physical objects. Ask me questions about what's visible, e.g., *'Rowan, what am I pointing my camera at?'*"
+          text: `📷 **Live Camera Connected (${facingModeParam === 'user' ? 'Front' : 'Back'}).** I can now view your surroundings. Ask me questions about what's visible!`
         }
       ])
     } catch (err) {
@@ -341,22 +476,23 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
 
   const startScreenSharing = async () => {
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      })
+      // Prompt for Display Media, prioritizing the ENTIRE desktop screen via our Capture Service
+      const stream = await screenCaptureService.startCapture()
       
       setLiveStreamType('screen')
       setScreenStream(stream)
       setIsScreenSharing(true)
       setIsSharePickerGuiding(false)
-      
-      stream.getVideoTracks()[0].onended = () => {
-        stopScreenSharing(stream)
+
+      // Auto-minimize the floating assistant container
+      if (onSetOpen) {
+        onSetOpen(false)
+      }
+
+      // Auto-start voice mode
+      if (!voiceModeActive && !isRealtimeActive) {
+        setVoiceModeActive(true)
+        rtStart().catch(console.error)
       }
 
       setMessages((prev) => [
@@ -381,11 +517,8 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
     }
   }
 
-  const stopScreenSharing = (streamToStop?: MediaStream | null) => {
-    const activeStream = streamToStop || screenStream
-    if (activeStream) {
-      activeStream.getTracks().forEach((track) => track.stop())
-    }
+  const stopScreenSharing = () => {
+    screenCaptureService.stopCapture()
     setScreenStream(null)
     setIsScreenSharing(false)
     
@@ -648,6 +781,7 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
 
   // Send message
   const handleSendMessage = async (textToSend?: string) => {
+    resetInactivityTimer()
     if (!textToSend) {
       wasLastInputVoiceRef.current = false
     }
@@ -969,6 +1103,58 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
             <span>{rtIsSpeaking ? 'Speaking' : rtIsSearching ? 'Thinking' : 'Listening'}</span>
           </motion.div>
         )}
+
+        {/* Mini Controls floating to the left on hover/active */}
+        <div className="absolute right-full mr-3.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleToggleVoiceMode()
+            }}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-lg border backdrop-blur-md cursor-pointer ${
+              voiceModeActive || isRealtimeActive
+                ? 'bg-rose-600 text-white border-rose-500 shadow-rose-600/20'
+                : 'bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700/60'
+            }`}
+            title={voiceModeActive || isRealtimeActive ? 'Stop Voice Mode' : 'Start Voice Mode'}
+          >
+            <Headphones className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (isScreenSharing) {
+                stopScreenSharing()
+              } else {
+                initiateScreenSharing()
+              }
+            }}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-lg border backdrop-blur-md cursor-pointer ${
+              isScreenSharing
+                ? 'bg-blue-600 text-white border-blue-500 shadow-blue-600/20'
+                : 'bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700/60'
+            }`}
+            title={isScreenSharing ? 'Stop Screen Sharing' : 'Start Screen Sharing'}
+          >
+            <Monitor className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Hidden video element kept mounted when minimized so captureCurrentFrame still works! */}
+        <video
+          ref={(node) => {
+            if (node) {
+              node.srcObject = screenStream
+            }
+            hiddenVideoRef.current = node
+          }}
+          autoPlay
+          playsInline
+          muted
+          className="hidden"
+        />
       </div>
     )
   }
@@ -1401,6 +1587,11 @@ export const RowanConversationalInterface: React.FC<RowanConversationalInterface
             activePreview={activePreview}
             onClosePreview={() => setActivePreview(null)}
             onOpenWebsite={(url, title) => setActivePreview({ url, title })}
+            isScreenSharing={isScreenSharing}
+            liveStreamType={liveStreamType}
+            onStartScreenShare={initiateScreenSharing}
+            onStopScreenShare={stopScreenSharing}
+            onStartCameraShare={(facingMode) => startCameraSharing(facingMode)}
           />
         ) : messages.length === 0 ? (
           /* STATE: IDLE HERO (NEW CHAT) */

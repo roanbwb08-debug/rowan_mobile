@@ -336,30 +336,65 @@ router.post('/session', async (req, res) => {
   try {
     console.log('[VOICE] Requesting ephemeral session from OpenAI Realtime API...')
     
-    const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-mini-realtime-preview'
+    const requestedModel = process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-mini-realtime-preview'
+    const modelsToTry = [
+      requestedModel,
+      'gpt-4o-mini-realtime-preview',
+      'gpt-4o-realtime-preview',
+      'gpt-realtime-2',
+      'gpt-4o-realtime-preview-2024-12-17'
+    ].filter((m, i, arr) => arr.indexOf(m) === i)
 
-    // Request a session token from OpenAI Realtime API
-    const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        session: {
-          type: 'realtime',
-          model
-        }
+    let response: Response | null = null
+    let selectedModel = requestedModel
+
+    for (const modelToTest of modelsToTry) {
+      console.log(`[VOICE] Attempting session creation with model: ${modelToTest}`)
+      const res = await fetch('https://api.openai.com/v1/realtime/sessions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: modelToTest
+        })
       })
-    })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      const isQuota = errorText.includes('insufficient_quota') || errorText.includes('credit_balance_exhausted')
-      if (isQuota) {
-        markOpenAIQuotaExhausted()
+      if (res.ok) {
+        response = res
+        selectedModel = modelToTest
+        break
+      } else {
+        const errTxt = await res.text()
+        console.warn(`[VOICE] Model ${modelToTest} returned status ${res.status}: ${errTxt}`)
+        if (res.status === 404 && modelToTest === modelsToTry[0]) {
+          // If 404 on endpoint, try legacy client_secrets endpoint
+          console.log('[VOICE] /v1/realtime/sessions endpoint returned 404. Falling back to /v1/realtime/client_secrets.')
+          const legacyRes = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              session: {
+                type: 'realtime',
+                model: modelToTest
+              }
+            })
+          })
+          if (legacyRes.ok) {
+            response = legacyRes
+            selectedModel = modelToTest
+            break
+          }
+        }
       }
-      console.warn('[VOICE] OpenAI Realtime Session response:', response.status, errorText)
+    }
+
+    if (!response || !response.ok) {
+      console.log('[VOICE] Realtime direct token session unavailable. Activating Rowan Live Voice mode.')
       return res.json({
         success: true,
         useFallbackMode: true,
@@ -375,12 +410,12 @@ router.post('/session', async (req, res) => {
         ? data.client_secret
         : (data.client_secret?.value || ''))
 
-    console.log('[VOICE] Ephemeral session created successfully with model:', model)
+    console.log('[VOICE] Ephemeral session created successfully with model:', selectedModel)
 
     return res.json({
       success: true,
       client_secret: { value: secretValue },
-      model
+      model: selectedModel
     })
   } catch (err) {
     console.error('[VOICE] Session creation route crash:', err)

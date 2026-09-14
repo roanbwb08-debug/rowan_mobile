@@ -1281,7 +1281,7 @@ export function useRealtimeVoice(options?: UseRealtimeVoiceOptions) {
 
       console.log('[ROWAN VOICE] SESSION_SUCCESS - Received ephemeral session token successfully')
       const clientSecret = tokenData.client_secret.value
-      const model = tokenData.model || 'gpt-4o-mini-realtime-preview'
+      const model = tokenData.model || 'gpt-realtime-2'
 
       // 3. Setup RTCPeerConnection with STUN servers for NAT/firewall traversal and poor network resilience
       const pc = new RTCPeerConnection({
@@ -1389,7 +1389,6 @@ export function useRealtimeVoice(options?: UseRealtimeVoiceOptions) {
           const sessionUpdate = {
             type: 'session.update',
             session: {
-              type: 'realtime',
               instructions: `You are Rowan, an advanced, warm, intelligent, and natural AI voice companion having a real, live spoken conversation.
 
 Voice Personality & Conversational Rules:
@@ -1448,28 +1447,38 @@ When delivering search results:
                   }
                 }
               ],
+              modalities: ['audio', 'text'],
               tool_choice: 'auto',
-              audio: {
-                input: {
-                  transcription: {
-                    model: 'whisper-1'
-                  },
-                  turn_detection: {
-                    type: 'server_vad',
-                    threshold: 0.5,
-                    prefix_padding_ms: 300,
-                    silence_duration_ms: 500
-                  }
-                },
-                output: {
-                  voice: (() => {
-                    const voiceId = (typeof window !== 'undefined' && window.localStorage)
-                      ? (window.localStorage.getItem('rowan_preferred_voice_id') || 'nova')
-                      : 'nova';
-                    console.log('[ROWAN VOICE] FEMALE_VOICE_SELECTED', voiceId);
-                    return voiceId;
-                  })()
-                }
+              voice: (() => {
+                const rawVoice = (typeof window !== 'undefined' && window.localStorage)
+                  ? (window.localStorage.getItem('rowan_preferred_voice_id') || 'coral')
+                  : 'coral';
+                const realtimeVoiceMap: Record<string, string> = {
+                  nova: 'coral',
+                  shimmer: 'shimmer',
+                  alloy: 'alloy',
+                  echo: 'echo',
+                  fable: 'verse',
+                  onyx: 'ash',
+                  sage: 'sage',
+                  coral: 'coral',
+                  ballad: 'ballad',
+                  verse: 'verse'
+                };
+                const mappedVoice = realtimeVoiceMap[rawVoice.toLowerCase()] || 'coral';
+                console.log('[ROWAN VOICE] REALTIME_VOICE_SELECTED:', mappedVoice, '(from requested:', rawVoice, ')');
+                return mappedVoice;
+              })(),
+              input_audio_format: 'pcm16',
+              output_audio_format: 'pcm16',
+              input_audio_transcription: {
+                model: 'whisper-1'
+              },
+              turn_detection: {
+                type: 'server_vad',
+                threshold: 0.5,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 500
               }
             }
           }
@@ -1649,6 +1658,13 @@ When delivering search results:
           realtimeInterruptionServiceRef.current.handleRealtimeEvent(oaiEvent)
 
           switch (oaiEvent.type) {
+            case 'error': {
+              const errObj = (oaiEvent as unknown as { error?: { message?: string; type?: string } }).error
+              console.warn('[RealtimeVoice] Received error event from OpenAI:', errObj)
+              addDiagnostic('Realtime API Error', errObj?.message || 'Realtime API error event', 'warning')
+              break
+            }
+
             case 'input_audio_buffer.speech_started': {
                console.log('[ROWAN VOICE] USER_SPEECH_ONSET | VAD input_audio_buffer.speech_started received')
                const wasSpeaking = stateRef.current === 'speaking' || realtimeInterruptionServiceRef.current.getIsSpeaking()
@@ -1685,6 +1701,18 @@ When delivering search results:
                  addDiagnostic('Speech Stopped', 'User stopped speaking. Awaiting transcription...', 'info')
                  changeState('thinking')
                }
+
+               // Guarantee voice response creation if server VAD does not auto-start response
+               setTimeout(() => {
+                 if (dc.readyState === 'open' && (stateRef.current === 'thinking' || stateRef.current === 'listening')) {
+                   console.log('[ROWAN VOICE] Explicit response.create trigger dispatched')
+                   try {
+                     dc.send(JSON.stringify({ type: 'response.create' }))
+                   } catch (err) {
+                     console.warn('[RealtimeVoice] Failed to send response.create trigger:', err)
+                   }
+                 }
+               }, 400)
                break
              }
  
@@ -1927,10 +1955,6 @@ When delivering search results:
               changeState('listening')
               break
 
-            case 'error':
-              console.warn('[RealtimeVoice] Event channel error event:', oaiEvent)
-              break
-
             default:
               break
           }
@@ -2001,7 +2025,7 @@ When delivering search results:
         controller.abort()
       }, 6000)
 
-      const sdpResponse = await fetch(`https://api.openai.com/v1/realtime/calls?model=${model}`, {
+      const sdpResponse = await fetch(`https://api.openai.com/v1/realtime?model=${model}`, {
         method: 'POST',
         body: modifiedSdp,
         headers: {

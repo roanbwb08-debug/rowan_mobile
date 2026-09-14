@@ -1,5 +1,6 @@
 import React from 'react'
 import { PhoneConnectionFlow } from '../components/PhoneConnectionFlow'
+import { MobileSimulator } from '../components/MobileSimulator'
 import { Shield, ArrowLeft } from 'lucide-react'
 
 interface ConnectPhoneProps {
@@ -24,13 +25,13 @@ export const ConnectPhone: React.FC<ConnectPhoneProps> = ({ navigate }) => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-16">
+    <div className="max-w-7xl mx-auto space-y-8 animate-fade-in pb-16">
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
         <div className="space-y-1">
           <button
             onClick={handleCancel}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-zinc-800 transition-colors mb-2 cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-zinc-800 transition-colors mb-2 cursor-pointer bg-transparent border-none p-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Connection Center</span>
@@ -56,8 +57,18 @@ export const ConnectPhone: React.FC<ConnectPhoneProps> = ({ navigate }) => {
         </div>
       </div>
 
-      {/* Main Flow Card */}
-      <PhoneConnectionFlow onComplete={handleComplete} onCancel={handleCancel} />
+      {/* Main Flow Layout: Two Columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Pairing Flow Card - 7 Columns */}
+        <div className="lg:col-span-7">
+          <PhoneConnectionFlow onComplete={handleComplete} onCancel={handleCancel} />
+        </div>
+
+        {/* Live Simulator - 5 Columns */}
+        <div className="lg:col-span-5 bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm">
+          <MobileSimulator />
+        </div>
+      </div>
     </div>
   )
 }

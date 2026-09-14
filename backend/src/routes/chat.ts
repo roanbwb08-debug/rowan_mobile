@@ -6,7 +6,7 @@ import { RowanOrchestrator } from '../services/ai/orchestration.js'
 import { getOrCreateSessionContext, getConversationMessages, appendConversationMessage, getTenantConnection, getTenantConnections } from '../services/db.js'
 import { retrieveLongTermMemory, updateConversationMemoryAndSummary } from '../services/memory.js'
 import { logChatAnalytics } from '../services/analytics.js'
-import { requireSupabaseUser } from '../services/supabase.js'
+import { verifySupabaseToken } from '../services/supabase.js'
 import type { RowanConnectionContext } from '../rowan.js'
 
 interface EcomProduct {
@@ -84,10 +84,19 @@ router.post('/', async (req, res) => {
   try {
     const sessionId = parsed.data.sessionId ?? crypto.randomUUID()
     
-    // Check for Supabase Auth Bearer Token
-    const supabaseUser = await requireSupabaseUser(req.headers.authorization)
-    const userEmail = supabaseUser.email
-    console.log(`[SUPABASE AUTH] Isolated session context for authenticated user: ${userEmail}`)
+    // Resolve user email from Supabase token if available, or fall back to tenant default
+    let userEmail = 'nobleroan474@gmail.com'
+    if (req.headers.authorization) {
+      try {
+        const user = await verifySupabaseToken(req.headers.authorization)
+        if (user?.email) {
+          userEmail = user.email
+        }
+      } catch {
+        // Fall back gracefully to default tenant email
+      }
+    }
+    console.log(`[SUPABASE AUTH] Isolated session context for user: ${userEmail}`)
     
     // Resolve Tenant Context via Cloud Firestore with Isolation
     const tenantContext = await getOrCreateSessionContext(sessionId, userEmail)

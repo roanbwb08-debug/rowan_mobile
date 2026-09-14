@@ -25,7 +25,10 @@ export async function generateContentWithFallback(
     sanitizedPrimary,
     'gemini-3.7-flash',
     'gemini-3.1-flash-lite',
-    'gemini-3.8-flash'
+    'gemini-3.8-flash',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-1.5-flash'
   ].filter((m, i, arr) => arr.indexOf(m) === i)
 
   let lastError: unknown = null
